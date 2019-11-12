@@ -201,4 +201,10 @@ where ValidationRatings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL
 		# break
 		print('user {0}, accuracy is {1:.2f}.'.format(userId, correct/len(predictY)))  # prefer format than %.
 
+	cur.execute('''select t.correct, t.total, CAST(t.correct AS float)/t.total as accuracy
+from (Select 
+(select count(*) from ValidationRatings where rating=predict) as correct,
+(select count(*) from ValidationRatings) as total) as t''')
+	print(cur.fetchone())
+
 	con.close()
