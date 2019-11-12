@@ -9,9 +9,10 @@ import bisect
 from sklearn import tree
 import numpy as np
 import sqlite3
+import matplotlib.pyplot as plt
 
 
-def ensureMovieYearGenresFile(fileName):
+def ensureMovieYearGenresFile(movieYearGenresFileName):
 	if os.path.isfile(os.path.join(DATA_FOLDER, movieYearGenresFileName)):
 		return
 
@@ -48,7 +49,7 @@ def ensureMovieYearGenresFile(fileName):
 
 	# print(', '.join(allGenres))
 
-	with open(DATA_FOLDER + "/" + fileName, encoding='utf-8', mode='w', newline='') as f:
+	with open(DATA_FOLDER + "/" + movieYearGenresFileName, encoding='utf-8', mode='w', newline='') as f:
 		writer = csv.writer(f)
 		writer.writerow(['id', 'year'] + ALL_GENRES)
 		for id in movies:
@@ -112,24 +113,92 @@ def ensureRatingsTable(fileName, dbConnection):
 	print(cur.fetchone())
 
 
+def ensureValidationRatingsTable(fileName, dbConnection):
+	cur = dbConnection.cursor()
+	TABLE_NAME = 'ValidationRatings'
+	if doesTableExist(TABLE_NAME, cur):
+		return
+
+	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL,rating INTEGER NOT NULL, predict INTEGER, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
+	with open(os.path.join(DATA_FOLDER, fileName), encoding='utf-8') as f:
+		csvReader = csv.reader(f)
+		next(csvReader)
+
+		to_db = [row for row in csvReader]
+
+		cur.executemany("INSERT INTO {0} VALUES (?,?,?,null);".format(TABLE_NAME), to_db)
+		dbConnection.commit()
+
+	cur.execute('select * from {0} where userId=1 and movieId=1653'.format(TABLE_NAME))
+	print(cur.fetchone())
+
+
 DATA_FOLDER = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../data")
 ALL_GENRES = sorted(['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'IMAX', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western'])
+MAX_ROWS = 0
 
 if __name__ == "__main__":
+	try:
+		i = sys.argv.index('--max-rows')
+		MAX_ROWS = int(sys.argv[i + 1])
+	except:
+		MAX_ROWS = None
+
 	movieYearGenresFileName = 'movies-year-genres.csv'
 	ensureMovieYearGenresFile(movieYearGenresFileName)
 
 	con = sqlite3.connect(os.path.join(DATA_FOLDER, "sqlite.db"))  # we may use ":memory:", but it may be too large, about 1.5GB
 	ensureMovieYearGenresTable(movieYearGenresFileName, con)
 	ensureRatingsTable('train_ratings_binary.csv', con)
+	ensureValidationRatingsTable('val_ratings_binary.csv', con)
 
+	# validationData = np.genfromtxt(os.path.join(DATA_FOLDER, 'val_ratings_binary.csv'), delimiter=',', dtype=int, skip_header=1, max_rows=MAX_ROWS)
+	# userIds = np.unique(validationData[:, 0])
 	cur = con.cursor()
+	cur.execute('select distinct userId from ValidationRatings')
+	userIds = cur.fetchall()
 
-	cur.execute('''
-SELECT Ratings.rating, Ratings.userId, MovieYearGenres.year, {0} FROM Ratings
-join MovieYearGenres on Ratings.movieId=MovieYearGenres.id'''.format(','.join(['[' + g + ']' for g in ALL_GENRES])))
-	print(cur.fetchone())
+	for userId in userIds:
+		userId = int(userId[0])  # the original data type is numpy.int32.
+		cur.execute('''
+SELECT Ratings.rating, MovieYearGenres.year, {0} FROM Ratings
+join MovieYearGenres on Ratings.movieId=MovieYearGenres.id
+where Ratings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL_GENRES])), (userId,))
+
+		trainingData = np.array(cur.fetchall())
+
+		y = trainingData[:, 0]
+		X = trainingData[:, 1:]
+
+		clf = tree.DecisionTreeClassifier()
+		clf = clf.fit(X, y)
+
+		cur.execute('''
+SELECT ValidationRatings.movieId, MovieYearGenres.year, {0} FROM ValidationRatings
+join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
+where ValidationRatings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL_GENRES])), (userId,))
+		testingData = np.array(cur.fetchall())
+
+		predictY = clf.predict(testingData[:, 1:])
+		toDB = predictY[:, None]
+
+		toDB = np.insert(toDB, 1, userId, axis=1)
+		toDB = np.insert(toDB, 2, testingData[:, 0], axis=1)
+		cur.executemany('update ValidationRatings set predict=? where userId=? and movieId=?', toDB.tolist())
+		if cur.rowcount == 0:
+			raise Exception("No rows are updated.")
+
+		# tree.plot_tree(clf)
+		# plt.show()
+
+		con.commit()
+
+		cur.execute('select count(*) from ValidationRatings where userId=? and rating=predict', (userId,))
+		correct=cur.fetchone()[0]
+
+
+
+		# break
+		print('user {0}, accuracy is {1:.2f}.'.format(userId, correct/len(predictY)))  # prefer format than %.
 
 	con.close()
-
-# clf = tree.DecisionTreeClassifier()
