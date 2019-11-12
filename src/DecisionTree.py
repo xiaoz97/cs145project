@@ -133,6 +133,23 @@ def ensureValidationRatingsTable(fileName, dbConnection):
 	print(cur.fetchone())
 
 
+def ensureTestRatingTable(fileName, dbConnection):
+	cur = dbConnection.cursor()
+	TABLE_NAME = 'TestRatings'
+	if doesTableExist(TABLE_NAME, cur):
+		return
+
+	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
+	with open(os.path.join(DATA_FOLDER, fileName), encoding='utf-8') as f:
+		csvReader = csv.reader(f)
+		next(csvReader)
+
+		to_db = [row for row in csvReader]
+
+		cur.executemany("INSERT INTO {0} VALUES (?,?);".format(TABLE_NAME), to_db)
+		dbConnection.commit()
+
+
 DATA_FOLDER = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../data")
 ALL_GENRES = sorted(['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'IMAX', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western'])
 MAX_ROWS = 0
@@ -151,6 +168,7 @@ if __name__ == "__main__":
 	ensureMovieYearGenresTable(movieYearGenresFileName, con)
 	ensureRatingsTable('train_ratings_binary.csv', con)
 	ensureValidationRatingsTable('val_ratings_binary.csv', con)
+	ensureTestRatingTable('test_ratings.csv', con)
 
 	# validationData = np.genfromtxt(os.path.join(DATA_FOLDER, 'val_ratings_binary.csv'), delimiter=',', dtype=int, skip_header=1, max_rows=MAX_ROWS)
 	# userIds = np.unique(validationData[:, 0])
@@ -194,12 +212,10 @@ where ValidationRatings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL
 		con.commit()
 
 		cur.execute('select count(*) from ValidationRatings where userId=? and rating=predict', (userId,))
-		correct=cur.fetchone()[0]
-
-
+		correct = cur.fetchone()[0]
 
 		# break
-		print('user {0}, accuracy is {1:.2f}.'.format(userId, correct/len(predictY)))  # prefer format than %.
+		print('user {0}, accuracy is {1:.2f}.'.format(userId, correct / len(predictY)))  # prefer format than %.
 
 	cur.execute('''select t.correct, t.total, CAST(t.correct AS float)/t.total as accuracy
 from (Select 
