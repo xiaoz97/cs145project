@@ -199,10 +199,26 @@ where ValidationRatings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL
 	con.commit()
 	predictTest(cur, userId, clf)
 	con.commit()
-	cur.execute('select count(*) from ValidationRatings where userId=? and rating=predict', (userId,))
-	correct = cur.fetchone()[0]
-	# break
-	print('user {0}, accuracy is {1:.2f}.'.format(userId, correct / len(predictY)))  # prefer format than %.
+	# cur.execute('select count(*) from ValidationRatings where userId=? and rating=predict', (userId,))
+	# correct = cur.fetchone()[0]
+	# # break
+	# print('user {0}, accuracy is {1:.2f}.'.format(userId, correct / len(predictY)))  # prefer format than %.
+	print('User {0} is done.'.format(userId))
+
+
+def dealWithMissingPrediction(cursor, table: str):
+	cursor.execute('update {0} set predict=? where predict is null'.format(table), (1,))
+	print('Fixed {0} empty prediction in table {1}.'.format(cursor.rowcount, table))
+
+
+def exportTestRatings(cursor, fileName: str):
+	cursor.execute('select rowid-1, predict from TestRatings order by rowid')
+	data=cursor.fetchall()
+	with open(os.path.join(DATA_FOLDER, fileName), 'w', newline="") as f:
+		writer = csv.writer(f, delimiter=',')
+		writer.writerow(['Id', 'rating'])
+
+		writer.writerows(data)
 
 
 def main():
@@ -222,16 +238,22 @@ def main():
 	ensureValidationRatingsTable('val_ratings_binary.csv', con)
 	ensureTestRatingTable('test_ratings.csv', con)
 
-	# validationData = np.genfromtxt(os.path.join(DATA_FOLDER, 'val_ratings_binary.csv'), delimiter=',', dtype=int, skip_header=1, max_rows=MAX_ROWS)
-	# userIds = np.unique(validationData[:, 0])
 	cur = con.cursor()
+
+	# cur.execute('update ValidationRatings set predict=null')
+	# cur.execute('update TestRatings set predict=null')
+	# con.commit()
+
 	cur.execute('select distinct userId from ValidationRatings')
 	userIds = [row[0] for row in cur.fetchall()]
 
 	startTime = time.time()
 
-	for userId in userIds:
-		classifyUser(con, userId)
+	# for userId in userIds:
+	# 	classifyUser(con, userId)
+
+	dealWithMissingPrediction(cur, 'ValidationRatings')
+	dealWithMissingPrediction(cur, 'TestRatings')
 
 	print('Used time: {0}'.format(time.time() - startTime))
 
@@ -240,6 +262,8 @@ from (Select
 (select count(*) from ValidationRatings where rating=predict) as correct,
 (select count(*) from ValidationRatings) as total) as t''')
 	print(cur.fetchone())
+
+	exportTestRatings(cur, 'submit.csv')
 
 	con.close()
 
