@@ -10,6 +10,7 @@ from sklearn import tree
 import numpy as np
 import sqlite3
 import matplotlib.pyplot as plt
+import time
 
 
 def ensureMovieYearGenresFile(movieYearGenresFileName):
@@ -176,6 +177,34 @@ where TestRatings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL_GENRE
 	cursor.executemany('update TestRatings set predict=? where userId=? and movieId=?', toDB.tolist())
 
 
+def classifyUser(con, userId):
+	cur = con.cursor()
+
+	clf = tree.DecisionTreeClassifier()
+	clf = trainClassifier(cur, userId, clf)
+	cur.execute('''
+SELECT ValidationRatings.movieId, MovieYearGenres.year, {0} FROM ValidationRatings
+join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
+where ValidationRatings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL_GENRES])), (userId,))
+	testingData = np.array(cur.fetchall())
+	predictY = clf.predict(testingData[:, 1:])
+	toDB = predictY[:, None]
+	toDB = np.insert(toDB, 1, userId, axis=1)
+	toDB = np.insert(toDB, 2, testingData[:, 0], axis=1)
+	cur.executemany('update ValidationRatings set predict=? where userId=? and movieId=?', toDB.tolist())
+	if cur.rowcount == 0:
+		raise Exception("No rows are updated.")
+	# tree.plot_tree(clf)
+	# plt.show()
+	con.commit()
+	predictTest(cur, userId, clf)
+	con.commit()
+	cur.execute('select count(*) from ValidationRatings where userId=? and rating=predict', (userId,))
+	correct = cur.fetchone()[0]
+	# break
+	print('user {0}, accuracy is {1:.2f}.'.format(userId, correct / len(predictY)))  # prefer format than %.
+
+
 def main():
 	global MAX_ROWS, ALL_GENRES, DATA_FOLDER
 	try:
@@ -198,39 +227,13 @@ def main():
 	cur = con.cursor()
 	cur.execute('select distinct userId from ValidationRatings')
 	userIds = [row[0] for row in cur.fetchall()]
+
+	startTime = time.time()
+
 	for userId in userIds:
-		clf = tree.DecisionTreeClassifier()
+		classifyUser(con, userId)
 
-		clf = trainClassifier(cur, userId, clf)
-
-		cur.execute('''
-SELECT ValidationRatings.movieId, MovieYearGenres.year, {0} FROM ValidationRatings
-join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
-where ValidationRatings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL_GENRES])), (userId,))
-		testingData = np.array(cur.fetchall())
-
-		predictY = clf.predict(testingData[:, 1:])
-		toDB = predictY[:, None]
-
-		toDB = np.insert(toDB, 1, userId, axis=1)
-		toDB = np.insert(toDB, 2, testingData[:, 0], axis=1)
-		cur.executemany('update ValidationRatings set predict=? where userId=? and movieId=?', toDB.tolist())
-		if cur.rowcount == 0:
-			raise Exception("No rows are updated.")
-
-		# tree.plot_tree(clf)
-		# plt.show()
-
-		con.commit()
-
-		predictTest(cur, userId, clf)
-		con.commit()
-
-		cur.execute('select count(*) from ValidationRatings where userId=? and rating=predict', (userId,))
-		correct = cur.fetchone()[0]
-
-		# break
-		print('user {0}, accuracy is {1:.2f}.'.format(userId, correct / len(predictY)))  # prefer format than %.
+	print('Used time: {0}'.format(time.time() - startTime))
 
 	cur.execute('''select t.correct, t.total, CAST(t.correct AS float)/t.total as accuracy
 from (Select 
