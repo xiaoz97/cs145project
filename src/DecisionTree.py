@@ -139,22 +139,45 @@ def ensureTestRatingTable(fileName, dbConnection):
 	if doesTableExist(TABLE_NAME, cur):
 		return
 
-	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
+	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL, predict integer, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
 	with open(os.path.join(DATA_FOLDER, fileName), encoding='utf-8') as f:
 		csvReader = csv.reader(f)
 		next(csvReader)
 
 		to_db = [row for row in csvReader]
 
-		cur.executemany("INSERT INTO {0} VALUES (?,?);".format(TABLE_NAME), to_db)
+		cur.executemany("INSERT INTO {0} VALUES (?,?, null);".format(TABLE_NAME), to_db)
 		dbConnection.commit()
 
 
-DATA_FOLDER = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../data")
-ALL_GENRES = sorted(['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'IMAX', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western'])
-MAX_ROWS = 0
+def trainClassifier(cursor, userId, clf):
+	cursor.execute('''
+SELECT Ratings.rating, MovieYearGenres.year, {0} FROM Ratings
+join MovieYearGenres on Ratings.movieId=MovieYearGenres.id
+where Ratings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL_GENRES])), (userId,))
+	trainingData = np.array(cursor.fetchall())
+	y = trainingData[:, 0]
+	X = trainingData[:, 1:]
+	return clf.fit(X, y)
 
-if __name__ == "__main__":
+
+def predictTest(cursor, userId, clf):
+	cursor.execute('''
+SELECT TestRatings.movieId, MovieYearGenres.year, {0} FROM TestRatings
+join MovieYearGenres on TestRatings.movieId=MovieYearGenres.id
+where TestRatings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL_GENRES])), (userId,))
+	testingData = np.array(cursor.fetchall())
+	predictY = clf.predict(testingData[:, 1:])
+
+	toDB = predictY[:, None]
+
+	toDB = np.insert(toDB, 1, userId, axis=1)
+	toDB = np.insert(toDB, 2, testingData[:, 0], axis=1)
+	cursor.executemany('update TestRatings set predict=? where userId=? and movieId=?', toDB.tolist())
+
+
+def main():
+	global MAX_ROWS, ALL_GENRES, DATA_FOLDER
 	try:
 		i = sys.argv.index('--max-rows')
 		MAX_ROWS = int(sys.argv[i + 1])
@@ -174,22 +197,11 @@ if __name__ == "__main__":
 	# userIds = np.unique(validationData[:, 0])
 	cur = con.cursor()
 	cur.execute('select distinct userId from ValidationRatings')
-	userIds = cur.fetchall()
-
+	userIds = [row[0] for row in cur.fetchall()]
 	for userId in userIds:
-		userId = int(userId[0])  # the original data type is numpy.int32.
-		cur.execute('''
-SELECT Ratings.rating, MovieYearGenres.year, {0} FROM Ratings
-join MovieYearGenres on Ratings.movieId=MovieYearGenres.id
-where Ratings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL_GENRES])), (userId,))
-
-		trainingData = np.array(cur.fetchall())
-
-		y = trainingData[:, 0]
-		X = trainingData[:, 1:]
-
 		clf = tree.DecisionTreeClassifier()
-		clf = clf.fit(X, y)
+
+		clf = trainClassifier(cur, userId, clf)
 
 		cur.execute('''
 SELECT ValidationRatings.movieId, MovieYearGenres.year, {0} FROM ValidationRatings
@@ -211,6 +223,9 @@ where ValidationRatings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL
 
 		con.commit()
 
+		predictTest(cur, userId, clf)
+		con.commit()
+
 		cur.execute('select count(*) from ValidationRatings where userId=? and rating=predict', (userId,))
 		correct = cur.fetchone()[0]
 
@@ -224,3 +239,11 @@ from (Select
 	print(cur.fetchone())
 
 	con.close()
+
+
+DATA_FOLDER = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../data")
+ALL_GENRES = sorted(['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'IMAX', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western'])
+MAX_ROWS = 0
+
+if __name__ == "__main__":
+	main()
