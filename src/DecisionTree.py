@@ -11,6 +11,7 @@ import numpy as np
 import sqlite3
 import matplotlib.pyplot as plt
 import time
+import zipfile
 
 
 def ensureMovieYearGenresFile(movieYearGenresFileName):
@@ -229,6 +230,21 @@ def main():
 	except:
 		MAX_ROWS = None
 
+	try:
+		i = sys.argv.index('--data-folder')
+		DATA_FOLDER = int(sys.argv[i + 1])
+	except:
+		pass
+
+	if os.path.isfile(os.path.join(DATA_FOLDER, 'movies.csv')) is False:
+		if os.system('kaggle competitions download -c uclacs145fall2019 -p "{0}"'.format(DATA_FOLDER)) != 0:
+			print("Unable to download dataset through kaggle API. Did you install the API and configure your API key properly?", file=sys.stderr)
+			print("Alternatively, you can specify the folder of the dataset with --data-folder.", file=sys.stderr)
+			exit(1)
+		else:
+			with zipfile.ZipFile(os.path.join(DATA_FOLDER, 'uclacs145fall2019.zip'), 'r') as z:
+				z.extractall(DATA_FOLDER)
+
 	movieYearGenresFileName = 'movies-year-genres.csv'
 	ensureMovieYearGenresFile(movieYearGenresFileName)
 
@@ -257,16 +273,31 @@ def main():
 
 	print('Used time: {0}'.format(time.time() - startTime))
 
+	lastAccuracy = 1
+	try:
+		with open(os.path.join(DATA_FOLDER, 'last accuracy.txt'), mode='r') as f:
+			lastAccuracy = float(f.read())
+	except:
+		pass
+
 	cur.execute('''select t.correct, t.total, CAST(t.correct AS float)/t.total as accuracy
 from (Select 
 (select count(*) from ValidationRatings where rating=predict) as correct,
 (select count(*) from ValidationRatings) as total) as t''')
-	print(cur.fetchone())
+	row = cur.fetchone()
+	print(row)
+	accuracy = row[2]
+
+	with open(os.path.join(DATA_FOLDER, 'last accuracy.txt'), mode='w') as f:
+		f.write(str(accuracy))
 
 	exportTestRatings(cur, 'submit.csv')
-
 	con.close()
 
+	print('last accuracy is {0}. This accuracy is {1}.'.format(lastAccuracy, accuracy))
+	if (accuracy > lastAccuracy):
+		if os.system('kaggle competitions submit -c uclacs145fall2019 -m "auto submission with accuracy {1}" -f "{0}"'.format(os.path.join(DATA_FOLDER, 'submit.csv'), accuracy)) != 0:
+			print("Unable to submit dataset through kaggle API. Did you install the API and configure your API key properly?", file=sys.stderr)
 
 DATA_FOLDER = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../data")
 ALL_GENRES = sorted(['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'IMAX', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western'])
