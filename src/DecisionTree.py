@@ -109,7 +109,13 @@ def ensureRatingsTable(fileName, dbConnection):
 
 		to_db = [row for row in csvReader]
 
-		cur.executemany("INSERT INTO {0} VALUES (%s,%s,%s);".format(TABLE_NAME), to_db)
+
+		to_db = [tuple(item) for item in to_db]
+		for i in range(len(to_db) // dbHelper.MAX_INSERT_ROWS):
+			values = ', '.join(map(str, to_db[dbHelper.MAX_INSERT_ROWS * i:dbHelper.MAX_INSERT_ROWS * i + dbHelper.MAX_INSERT_ROWS - 1]))
+			query = "INSERT INTO {0} VALUES {1}".format(TABLE_NAME, values)
+			cur.execute(query)
+
 		dbConnection.commit()
 
 	cur.execute('select * from {0} where userId=1 and movieId=151'.format(TABLE_NAME))
