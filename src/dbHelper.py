@@ -1,15 +1,15 @@
 
-import sqlite3
+import mysql.connector
 
 
 def doesTableExist(TABLE_NAME, cur):
-	cur.execute("SELECT 1 FROM sqlite_master WHERE name =? and type='table'", (TABLE_NAME,))
+	cur.execute("SELECT 1 FROM information_schema.tables WHERE table_schema = 'data_mining' AND table_name = %s", (TABLE_NAME,))
 	return cur.fetchone() is not None
 
 
 def delimiteDBIdentifier(identifier: str) -> str:
-	return '[' + identifier + ']'
+	return '`' + identifier + '`'
 
 
 def getConnection(database):
-	return sqlite3.connect(database, timeout=20)  # we may use ":memory:", but it may be too large, about 1.5GB
+	return mysql.connector.connect(database)  # we may use ":memory:", but it may be too large, about 1.5GB

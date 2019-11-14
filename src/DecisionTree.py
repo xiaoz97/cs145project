@@ -4,6 +4,7 @@ import bisect
 import csv
 import dbHelper
 import matplotlib.pyplot as plt
+import mysql.connector
 import numpy as np
 import os
 import re
@@ -88,7 +89,7 @@ def ensureMovieYearGenresTable(movieYearGenresFileName, dbConnection):
 
 		to_db = [row for row in csvReader]
 
-		cur.executemany("INSERT INTO {1} VALUES ({0});".format(','.join(['?'] * len(headers)), TABLE_NAME), to_db)
+		cur.executemany("INSERT INTO {1} VALUES ({0});".format(','.join(['%s'] * len(headers)), TABLE_NAME), to_db)
 		dbConnection.commit()
 
 	cur.execute('select * from {0} where id=131162'.format(TABLE_NAME))
@@ -108,7 +109,7 @@ def ensureRatingsTable(fileName, dbConnection):
 
 		to_db = [row for row in csvReader]
 
-		cur.executemany("INSERT INTO {0} VALUES (?,?,?);".format(TABLE_NAME), to_db)
+		cur.executemany("INSERT INTO {0} VALUES (%s,%s,%s);".format(TABLE_NAME), to_db)
 		dbConnection.commit()
 
 	cur.execute('select * from {0} where userId=1 and movieId=151'.format(TABLE_NAME))
@@ -128,7 +129,7 @@ def ensureValidationRatingsTable(fileName, dbConnection):
 
 		to_db = [row for row in csvReader]
 
-		cur.executemany("INSERT INTO {0} VALUES (?,?,?,null);".format(TABLE_NAME), to_db)
+		cur.executemany("INSERT INTO {0} VALUES (%s,%s,%s,null);".format(TABLE_NAME), to_db)
 		dbConnection.commit()
 
 	cur.execute('select * from {0} where userId=1 and movieId=1653'.format(TABLE_NAME))
@@ -148,7 +149,7 @@ def ensureTestRatingTable(fileName, dbConnection):
 
 		to_db = [row for row in csvReader]
 
-		cur.executemany("INSERT INTO {0} VALUES (?,?, null);".format(TABLE_NAME), to_db)
+		cur.executemany("INSERT INTO {0} VALUES (%s,%s, null);".format(TABLE_NAME), to_db)
 		dbConnection.commit()
 
 
@@ -177,7 +178,7 @@ where TestRatings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentifier(g)
 
 	toDB = np.insert(toDB, 1, userId, axis=1)
 	toDB = np.insert(toDB, 2, testingData[:, 0], axis=1)
-	cursor.executemany('update TestRatings set predict=? where userId=? and movieId=?', toDB.tolist())
+	cursor.executemany('update TestRatings set predict=%s where userId=%s and movieId=%s', toDB.tolist())
 
 
 def getMajorityRating(cur, userId=None):
@@ -239,7 +240,7 @@ where ValidationRatings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentif
 	toDB = predictY[:, None]
 	toDB = np.insert(toDB, 1, userId, axis=1)
 	toDB = np.insert(toDB, 2, validationData[:, 0], axis=1)
-	cur.executemany('update ValidationRatings set predict=? where userId=? and movieId=?', toDB.tolist())
+	cur.executemany('update ValidationRatings set predict=%s where userId=%s and movieId=%s', toDB.tolist())
 	if cur.rowcount == 0:
 		raise Exception("No rows are updated.")
 	# tree.plot_tree(clf)
@@ -325,7 +326,7 @@ def main():
 	movieYearGenresFileName = 'movies-year-genres.csv'
 	ensureMovieYearGenresFile(DATA_FOLDER, movieYearGenresFileName)
 
-	con = dbHelper.getConnection(os.path.join(DATA_FOLDER, "sqlite.db"))
+	con = dbHelper.getConnection((user='root', password='root', host='127.0.0.1', database='data_mining'))
 	ensureMovieYearGenresTable(movieYearGenresFileName, con)
 	ensureRatingsTable('train_ratings_binary.csv', con)
 	ensureValidationRatingsTable('val_ratings_binary.csv', con)
