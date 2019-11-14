@@ -2,13 +2,14 @@
 
 import os
 import csv
+import dbHelper
 import re
 import sys
 from types import SimpleNamespace
 import bisect
 from sklearn import tree
 import numpy as np
-import sqlite3
+
 import matplotlib.pyplot as plt
 import time
 import zipfile
@@ -63,16 +64,10 @@ def ensureMovieYearGenresFile(movieYearGenresFileName):
 
 			writer.writerow([id, item.year] + map)
 
-
-def doesTableExist(TABLE_NAME, cur):
-	cur.execute("SELECT 1 FROM sqlite_master WHERE name =? and type='table'", (TABLE_NAME,))
-	return cur.fetchone() is not None
-
-
 def ensureMovieYearGenresTable(movieYearGenresFileName, dbConnection):
 	cur = dbConnection.cursor()
 	TABLE_NAME = 'MovieYearGenres'
-	if doesTableExist(TABLE_NAME, cur):
+	if dbHelper.doesTableExist(TABLE_NAME, cur):
 		return
 
 	# Syntax 'create table if not exists' exists, but we don't know if we need to insert rows.
@@ -81,14 +76,14 @@ def ensureMovieYearGenresTable(movieYearGenresFileName, dbConnection):
 		headers = next(csvReader)
 
 		headers[0] = headers[0] + ' INTEGER NOT NULL PRIMARY KEY'
-		headers = headers[0:1] + ['[' + h + '] INTEGER' for h in headers[1:]]
+		headers = headers[0:1] + [dbHelper.delimiteDBIdentifier(h) + ' INTEGER' for h in headers[1:]]
 		cur.execute("CREATE TABLE {1} ({0})".format(', '.join(headers), TABLE_NAME))
 		# table names can't be the target of parameter substitution
 		# https://stackoverflow.com/a/3247553/746461
 
 		to_db = [row for row in csvReader]
 
-		cur.executemany("INSERT INTO {1} VALUES ({0});".format(','.join('?' * len(headers)), TABLE_NAME), to_db)
+		cur.executemany("INSERT INTO {1} VALUES ({0});".format(','.join(['?'] * len(headers)), TABLE_NAME), to_db)
 		dbConnection.commit()
 
 	cur.execute('select * from {0} where id=131162'.format(TABLE_NAME))
@@ -98,7 +93,7 @@ def ensureMovieYearGenresTable(movieYearGenresFileName, dbConnection):
 def ensureRatingsTable(fileName, dbConnection):
 	cur = dbConnection.cursor()
 	TABLE_NAME = 'Ratings'
-	if doesTableExist(TABLE_NAME, cur):
+	if dbHelper.doesTableExist(TABLE_NAME, cur):
 		return
 
 	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL,rating INTEGER NOT NULL, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
@@ -118,7 +113,7 @@ def ensureRatingsTable(fileName, dbConnection):
 def ensureValidationRatingsTable(fileName, dbConnection):
 	cur = dbConnection.cursor()
 	TABLE_NAME = 'ValidationRatings'
-	if doesTableExist(TABLE_NAME, cur):
+	if dbHelper.doesTableExist(TABLE_NAME, cur):
 		return
 
 	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL,rating INTEGER NOT NULL, predict INTEGER, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
@@ -138,7 +133,7 @@ def ensureValidationRatingsTable(fileName, dbConnection):
 def ensureTestRatingTable(fileName, dbConnection):
 	cur = dbConnection.cursor()
 	TABLE_NAME = 'TestRatings'
-	if doesTableExist(TABLE_NAME, cur):
+	if dbHelper.doesTableExist(TABLE_NAME, cur):
 		return
 
 	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL, predict integer, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
@@ -156,7 +151,7 @@ def trainClassifier(cursor, userId, clf):
 	cursor.execute('''
 SELECT Ratings.rating, MovieYearGenres.year, {0} FROM Ratings
 join MovieYearGenres on Ratings.movieId=MovieYearGenres.id
-where Ratings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL_GENRES])), (userId,))
+where Ratings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentifier(g) for g in ALL_GENRES])), (userId,))
 	trainingData = np.array(cursor.fetchall())
 	if len(trainingData) == 0:
 		raise Exception('User {0} does not appear in training set.'.format(userId))
@@ -169,7 +164,7 @@ def predictTest(cursor, userId, clf):
 	cursor.execute('''
 SELECT TestRatings.movieId, MovieYearGenres.year, {0} FROM TestRatings
 join MovieYearGenres on TestRatings.movieId=MovieYearGenres.id
-where TestRatings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL_GENRES])), (userId,))
+where TestRatings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentifier(g) for g in ALL_GENRES])), (userId,))
 	testingData = np.array(cursor.fetchall())
 	predictY = clf.predict(testingData[:, 1:])
 
@@ -188,7 +183,7 @@ def classifyUser(con, userId):
 	cur.execute('''
 SELECT ValidationRatings.movieId, MovieYearGenres.year, {0} FROM ValidationRatings
 join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
-where ValidationRatings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL_GENRES])), (userId,))
+where ValidationRatings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentifier(g) for g in ALL_GENRES])), (userId,))
 	validationData = np.array(cur.fetchall())
 	predictY = clf.predict(validationData[:, 1:])
 	toDB = predictY[:, None]
