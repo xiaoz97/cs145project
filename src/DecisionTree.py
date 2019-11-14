@@ -25,7 +25,7 @@ def ensureMovieYearGenresFile(dataFolder, movieYearGenresFileName):
 
 	movies = {}
 	global ALL_GENRES
-	with open(dataFolder + "/movies.csv", encoding='utf-8') as moviesFile:  # will automatically close the file when exit the with block
+	with open(os.path.join(dataFolder, 'movies.csv'), encoding='utf-8') as moviesFile:  # will automatically close the file when exit the with block
 		reader = csv.reader(moviesFile)
 		next(reader)  # skip the column headers
 		for row in reader:
@@ -76,20 +76,25 @@ def ensureMovieYearGenresTable(movieYearGenresFileName, dbConnection):
 		return
 
 	# Syntax 'create table if not exists' exists, but we don't know if we need to insert rows.
-	with open(os.path.join(DATA_FOLDER, movieYearGenresFileName), encoding='utf-8') as movieYearGenresFile:
+	with open(movieYearGenresFileName, encoding='utf-8') as movieYearGenresFile:
 		csvReader = csv.reader(movieYearGenresFile)
 		headers = next(csvReader)
 
 		headers[0] = headers[0] + ' INTEGER NOT NULL PRIMARY KEY'
-		headers = headers[0:1] + [dbHelper.delimiteDBIdentifier(h) + ' INTEGER' for h in headers[1:]]
-		cur.execute("CREATE TABLE {1} ({0})".format(', '.join(headers), TABLE_NAME))
-		# table names can't be the target of parameter substitution
-		# https://stackoverflow.com/a/3247553/746461
+		headers = headers[0:1] + ['year int not null'] + [dbHelper.delimiteDBIdentifier(h) + ' bit not null' for h in headers[2:]]
+	cur.execute('''
+CREATE TABLE {1} ({0})
 
-		to_db = [row for row in csvReader]
+bulk insert {1}
+from N'{2}'
+WITH(
+FIELDTERMINATOR = ',',
+-- ROWTERMINATOR = '0x0a', -- must not specify ROWTERMINATOR. Otherwise the last column has issues in data conversion.
+FIRSTROW =2
+)
+'''.format(', '.join(headers), TABLE_NAME, movieYearGenresFileName))
 
-		cur.executemany("INSERT INTO {1} VALUES ({0});".format(','.join(['?'] * len(headers)), TABLE_NAME), to_db)
-		dbConnection.commit()
+	dbConnection.commit()
 
 	cur.execute('select * from {0} where id=131162'.format(TABLE_NAME))
 	print(cur.fetchone())
@@ -101,15 +106,30 @@ def ensureRatingsTable(fileName, dbConnection):
 	if dbHelper.doesTableExist(TABLE_NAME, cur):
 		return
 
-	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL,rating INTEGER NOT NULL, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
-	with open(os.path.join(DATA_FOLDER, fileName), encoding='utf-8') as f:
-		csvReader = csv.reader(f)
-		next(csvReader)
+	t = time.time()
+	cur.execute('''
+CREATE TABLE {0}(
+	[userId] [int] NOT NULL,
+	[movieId] [float] NOT NULL,
+	[rating] [bit] NOT NULL);
 
-		to_db = [row for row in csvReader]
+bulk insert dbo.ratings
+from N'{1}'
+WITH(
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '0x0a',
+	FIRSTROW =2
+);
 
-		cur.executemany("INSERT INTO {0} VALUES (?,?,?);".format(TABLE_NAME), to_db)
-		dbConnection.commit()
+ALTER TABLE {0}
+alter column [movieId] int not null;
+
+ALTER TABLE {0}
+ADD PRIMARY KEY (userId,movieId);
+'''.format(TABLE_NAME, fileName))
+
+	dbConnection.commit()
+	print('insert time:{0}'.format(time.time() - t))
 
 	cur.execute('select * from {0} where userId=1 and movieId=151'.format(TABLE_NAME))
 	print(cur.fetchone())
@@ -121,15 +141,28 @@ def ensureValidationRatingsTable(fileName, dbConnection):
 	if dbHelper.doesTableExist(TABLE_NAME, cur):
 		return
 
-	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL,rating INTEGER NOT NULL, predict INTEGER, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
-	with open(os.path.join(DATA_FOLDER, fileName), encoding='utf-8') as f:
-		csvReader = csv.reader(f)
-		next(csvReader)
+	cur.execute('''
+CREATE TABLE {0} (userId INTEGER NOT NULL,movieId float NOT NULL,rating bit NOT NULL);
 
-		to_db = [row for row in csvReader]
+bulk insert {0}
+from N'{1}'
+WITH(
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '0x0a',
+	FIRSTROW =2
+);
 
-		cur.executemany("INSERT INTO {0} VALUES (?,?,?,null);".format(TABLE_NAME), to_db)
-		dbConnection.commit()
+ALTER TABLE {0}
+alter column [movieId] int not null;
+
+ALTER TABLE {0}
+add predict bit;
+
+ALTER TABLE {0}
+ADD PRIMARY KEY (userId,movieId);
+'''.format(TABLE_NAME, fileName))
+
+	dbConnection.commit()
 
 	cur.execute('select * from {0} where userId=1 and movieId=1653'.format(TABLE_NAME))
 	print(cur.fetchone())
@@ -141,15 +174,29 @@ def ensureTestRatingTable(fileName, dbConnection):
 	if dbHelper.doesTableExist(TABLE_NAME, cur):
 		return
 
-	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL, predict integer, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
-	with open(os.path.join(DATA_FOLDER, fileName), encoding='utf-8') as f:
-		csvReader = csv.reader(f)
-		next(csvReader)
+	cur.execute('''
+CREATE TABLE {0} (userId INTEGER NOT NULL,movieId float NOT NULL);
 
-		to_db = [row for row in csvReader]
+bulk insert {0}
+from N'{1}'
+WITH(
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '0x0a',
+	FIRSTROW =2
+);
 
-		cur.executemany("INSERT INTO {0} VALUES (?,?, null);".format(TABLE_NAME), to_db)
-		dbConnection.commit()
+ALTER TABLE {0}
+alter column [movieId] int not null;
+
+ALTER TABLE {0}
+add predict bit;
+
+ALTER TABLE {0}
+ADD PRIMARY KEY (userId,movieId);
+
+'''.format(TABLE_NAME, fileName))
+
+	dbConnection.commit()
 
 
 def trainClassifier(cursor, userId, clf):
@@ -272,11 +319,11 @@ def main():
 	movieYearGenresFileName = 'movies-year-genres.csv'
 	ensureMovieYearGenresFile(DATA_FOLDER, movieYearGenresFileName)
 
-	con = dbHelper.getConnection(os.path.join(DATA_FOLDER, "sqlite.db"))
-	ensureMovieYearGenresTable(movieYearGenresFileName, con)
-	ensureRatingsTable('train_ratings_binary.csv', con)
-	ensureValidationRatingsTable('val_ratings_binary.csv', con)
-	ensureTestRatingTable('test_ratings.csv', con)
+	con = dbHelper.getConnection()
+	ensureMovieYearGenresTable(os.path.join(DATA_FOLDER, movieYearGenresFileName), con)
+	ensureRatingsTable(os.path.join(DATA_FOLDER, 'train_ratings_binary.csv'), con)
+	ensureValidationRatingsTable(os.path.join(DATA_FOLDER, 'val_ratings_binary.csv'), con)
+	ensureTestRatingTable(os.path.join(DATA_FOLDER, 'test_ratings.csv'), con)
 
 	cur = con.cursor()
 

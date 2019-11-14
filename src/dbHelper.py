@@ -1,9 +1,9 @@
 
-import sqlite3
+import pyodbc
 
 
 def doesTableExist(TABLE_NAME, cur):
-	cur.execute("SELECT 1 FROM sqlite_master WHERE name =? and type='table'", (TABLE_NAME,))
+	cur.execute("SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dbo' AND  TABLE_NAME = ?", (TABLE_NAME,))
 	return cur.fetchone() is not None
 
 
@@ -11,5 +11,5 @@ def delimiteDBIdentifier(identifier: str) -> str:
 	return '[' + identifier + ']'
 
 
-def getConnection(database):
-	return sqlite3.connect(database, timeout=20)  # we may use ":memory:", but it may be too large, about 1.5GB
+def getConnection():
+	return pyodbc.connect('DRIVER={SQL Server};SERVER=DESKTOP-FHIBPCT;DATABASE=data_mining;Trusted_Connection=yes')
