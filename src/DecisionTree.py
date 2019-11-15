@@ -180,6 +180,51 @@ where TestRatings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentifier(g)
 	cursor.executemany('update TestRatings set predict=? where userId=? and movieId=?', toDB.tolist())
 
 
+def getMajorityRating(cur, userId=None):
+	"""
+	get majority rating of a user. If the user doesn't appear in training set, return None.
+
+	If userId is not specified, return the majority rating of all users.
+	:param cur:
+	:param userId:
+	:return:
+	"""
+	if userId is not None:
+		cur.execute('''
+SELECT rating, count(*) FROM Ratings
+where Ratings.userId=?
+GROUP by rating
+order by rating''', (userId,))
+	else:
+		cur.execute('''
+SELECT rating, count(*) FROM Ratings
+GROUP by rating
+order by rating''')
+
+	rows = cur.fetchall()
+	if len(rows) > 0:
+		# There are users who didn't appear in training test appears in the validation or test set.
+		count0 = 0
+		count1 = 0
+		if rows[0][0] == 0:
+			count0 = rows[0][1]
+
+			if len(rows) > 1:
+				count1 = rows[1][1]
+		elif rows[0][0] == 1:
+			count1 = rows[0][1]
+
+			assert len(rows) == 1
+
+		if count0 > count1:
+			predict = 0
+		else:
+			predict = 1
+	else:
+		predict = None
+	return predict
+
+
 def classifyForUser(con, userId):
 	cur = con.cursor()
 
