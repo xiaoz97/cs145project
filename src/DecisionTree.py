@@ -158,6 +158,8 @@ SELECT Ratings.rating, MovieYearGenres.year, {0} FROM Ratings
 join MovieYearGenres on Ratings.movieId=MovieYearGenres.id
 where Ratings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL_GENRES])), (userId,))
 	trainingData = np.array(cursor.fetchall())
+	if len(trainingData) == 0:
+		raise Exception('User {0} does not appear in training set.'.format(userId))
 	y = trainingData[:, 0]
 	X = trainingData[:, 1:]
 	return clf.fit(X, y)
