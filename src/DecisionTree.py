@@ -245,7 +245,7 @@ def main():
 	movieYearGenresFileName = 'movies-year-genres.csv'
 	ensureMovieYearGenresFile(movieYearGenresFileName)
 
-	con = sqlite3.connect(os.path.join(DATA_FOLDER, "sqlite.db"))  # we may use ":memory:", but it may be too large, about 1.5GB
+	con = dbHelper.getConnection(os.path.join(DATA_FOLDER, "sqlite.db"))
 	ensureMovieYearGenresTable(movieYearGenresFileName, con)
 	ensureRatingsTable('train_ratings_binary.csv', con)
 	ensureValidationRatingsTable('val_ratings_binary.csv', con)

@@ -1,4 +1,5 @@
 
+import sqlite3
 
 
 def doesTableExist(TABLE_NAME, cur):
@@ -8,3 +9,7 @@ def doesTableExist(TABLE_NAME, cur):
 
 def delimiteDBIdentifier(identifier: str) -> str:
 	return '[' + identifier + ']'
+
+
+def getConnection(database):
+	return sqlite3.connect(database)  # we may use ":memory:", but it may be too large, about 1.5GB
