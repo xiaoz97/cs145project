@@ -283,10 +283,10 @@ def main():
 
 	print('Used time: {0}'.format(time.time() - startTime))
 
-	lastAccuracy = 1
+	bestAccuracy = 1
 	try:
-		with open(os.path.join(DATA_FOLDER, 'last accuracy.txt'), mode='r') as f:
-			lastAccuracy = float(f.read())
+		with open(os.path.join(DATA_FOLDER, 'best accuracy.txt'), mode='r') as f:
+			bestAccuracy = float(f.read())
 	except:
 		pass
 
@@ -298,16 +298,16 @@ from (Select
 	print(row)
 	accuracy = row[2]
 
-	with open(os.path.join(DATA_FOLDER, 'last accuracy.txt'), mode='w') as f:
-		f.write(str(accuracy))
-
 	exportTestRatings(cur, 'submit.csv')
 	con.close()
 
-	print('last accuracy is {0}. This accuracy is {1}.'.format(lastAccuracy, accuracy))
-	if (accuracy > lastAccuracy):
+	print('Best accuracy is {0}. This accuracy is {1}.'.format(bestAccuracy, accuracy))
+	if accuracy > bestAccuracy:
+		with open(os.path.join(DATA_FOLDER, 'best accuracy.txt'), mode='w') as f:
+			f.write(str(accuracy))
 		if os.system('kaggle competitions submit -c uclacs145fall2019 -m "auto submission with accuracy {1}" -f "{0}"'.format(os.path.join(DATA_FOLDER, 'submit.csv'), accuracy)) != 0:
 			print("Unable to submit dataset through kaggle API. Did you install the API and configure your API key properly?", file=sys.stderr)
+
 
 DATA_FOLDER = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../data")
 ALL_GENRES = sorted(['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'IMAX', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western'])
