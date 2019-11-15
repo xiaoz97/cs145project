@@ -189,11 +189,11 @@ def classifyUser(con, userId):
 SELECT ValidationRatings.movieId, MovieYearGenres.year, {0} FROM ValidationRatings
 join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
 where ValidationRatings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL_GENRES])), (userId,))
-	testingData = np.array(cur.fetchall())
-	predictY = clf.predict(testingData[:, 1:])
+	validationData = np.array(cur.fetchall())
+	predictY = clf.predict(validationData[:, 1:])
 	toDB = predictY[:, None]
 	toDB = np.insert(toDB, 1, userId, axis=1)
-	toDB = np.insert(toDB, 2, testingData[:, 0], axis=1)
+	toDB = np.insert(toDB, 2, validationData[:, 0], axis=1)
 	cur.executemany('update ValidationRatings set predict=? where userId=? and movieId=?', toDB.tolist())
 	if cur.rowcount == 0:
 		raise Exception("No rows are updated.")
