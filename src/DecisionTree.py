@@ -265,8 +265,8 @@ def main():
 
 	startTime = time.time()
 
-	# for userId in userIds:
-	# 	classifyUser(con, userId)
+	for userId in userIds:
+		classifyUser(con, userId)
 
 	dealWithMissingPrediction(cur, 'ValidationRatings')
 	dealWithMissingPrediction(cur, 'TestRatings')
