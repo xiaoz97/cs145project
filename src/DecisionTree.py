@@ -286,8 +286,9 @@ def dealWithMissingPrediction(cursor, table: str):
 
 
 def exportTestRatings(cursor, fileName: str):
-	cursor.execute('select rowid-1, predict from TestRatings order by rowid')
+	cursor.execute('select predict from TestRatings order by userId,movieId')
 	data = cursor.fetchall()
+	data = [[i] + data[i] for i in range(len(data))]
 	with open(os.path.join(DATA_FOLDER, fileName), 'w', newline="") as f:
 		writer = csv.writer(f, delimiter=',')
 		writer.writerow(['Id', 'rating'])
