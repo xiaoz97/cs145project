@@ -12,4 +12,4 @@ def delimiteDBIdentifier(identifier: str) -> str:
 
 
 def getConnection(database):
-	return sqlite3.connect(database)  # we may use ":memory:", but it may be too large, about 1.5GB
+	return sqlite3.connect(database, timeout=20)  # we may use ":memory:", but it may be too large, about 1.5GB
