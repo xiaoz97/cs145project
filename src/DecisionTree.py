@@ -16,6 +16,11 @@ import matplotlib.pyplot as plt
 import time
 import zipfile
 
+from multiprocessing import Pool
+from multiprocessing import cpu_count
+from sklearn import tree
+from types import SimpleNamespace
+
 import datasetHelper
 
 
@@ -302,7 +307,7 @@ where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range
 	cursor.executemany('update TestRatings set predict=? where userId=? and movieId=?', toDB.tolist())
 
 
-def classifyUser(con, userId):
+def classifyForUser(con, userId):
 	global ALL_TAG_IDS
 	tagBitsCount = math.ceil(len(ALL_TAG_IDS) / 32.0)
 
@@ -359,6 +364,39 @@ def exportTestRatings(cursor, fileName: str):
 		writer.writerows(data)
 
 
+def classifyForUsersInThread(threadId, userIds):
+	assert threadId > 0
+
+	with dbHelper.getConnection(os.path.join(DATA_FOLDER, "sqlite.db")) as con:
+		startTime = time.time()
+		lastP = 0
+		total = len(userIds)
+		for i in range(total):
+			try:
+				classifyForUser(con, userIds[i])
+			except sqlite3.OperationalError as ex:
+				print(ex,file=sys.stderr)
+				exit(1)
+			except Exception as ex:
+				print(ex, file=sys.stderr)
+
+			p = i * 100 // total
+			if p > lastP:
+				usedTime = time.time() - startTime
+				print('[Thread {4}] User {0} is done. Progress is {1}%. Used time is {2}s, Remaining time is {3:d}s.'.
+					  format(userIds[i], p, int(usedTime), int(usedTime / p * 100 - usedTime), threadId))
+				lastP = p
+
+
+
+def chunkify(l, n):
+	"""Yield n number of sequential chunks from l."""
+	d, r = divmod(len(l), n)
+	for i in range(n):
+		si = (d + 1) * (i if i < r else r) + d * (0 if i < r else i - r)
+		yield l[si:si + (d + 1 if i < r else d)]
+
+
 def main():
 	global MAX_ROWS, ALL_GENRES, DATA_FOLDER, ALL_TAG_IDS, FIRST_USERS
 	try:
@@ -412,16 +450,14 @@ SELECT userId FROM TestRatings''')
 
 	startTime = time.time()
 
-	lastP = 0
-	total = len(userIds)
-	for i in range(total):
-		classifyUser(con, userIds[i])
+	chunkedUserIds = list(chunkify(userIds, cpu_count()))
+	pool = Pool(len(chunkedUserIds))
 
-		p = i * 100 // total
-		if p > lastP:
-			usedTime = time.time() - startTime
-			print('User {0} is done. Progress is {1}%. Used time is {2}s, Remaining time is {3:d}s'.format(i, p, int(usedTime), int(usedTime / p * 100 - usedTime)))
-			lastP = p
+	for i in range(len(chunkedUserIds)):
+		pool.apply_async(classifyForUsersInThread, args=(i + 1, chunkedUserIds[i]))
+
+	pool.close()
+	pool.join()
 
 	dealWithMissingPrediction(cur, 'ValidationRatings')
 	dealWithMissingPrediction(cur, 'TestRatings')
