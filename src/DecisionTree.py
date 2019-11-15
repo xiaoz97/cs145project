@@ -204,7 +204,7 @@ where ValidationRatings.userId=? '''.format(','.join(['[' + g + ']' for g in ALL
 	# correct = cur.fetchone()[0]
 	# # break
 	# print('user {0}, accuracy is {1:.2f}.'.format(userId, correct / len(predictY)))  # prefer format than %.
-	print('User {0} is done.'.format(userId))
+	# print('User {0} is done.'.format(userId))
 
 
 def dealWithMissingPrediction(cursor, table: str):
@@ -265,8 +265,16 @@ def main():
 
 	startTime = time.time()
 
-	for userId in userIds:
-		classifyUser(con, userId)
+	lastP = 0
+	total = len(userIds)
+	for i in range(total):
+		classifyUser(con, userIds[i])
+
+		p = i * 100 // total
+		if p > lastP:
+			usedTime = time.time() - startTime
+			print('User {0} is done. Progress is {1}%. Used time is {2}s, Remaining time is {3:d}s'.format(i, p, int(usedTime), int(usedTime / p * 100 - usedTime)))
+			lastP = p
 
 	dealWithMissingPrediction(cur, 'ValidationRatings')
 	dealWithMissingPrediction(cur, 'TestRatings')
