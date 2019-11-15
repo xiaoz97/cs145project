@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 
-import os
+import bisect
 import csv
 import dbHelper
-import re
-import sys
-from types import SimpleNamespace
-import bisect
-from sklearn import tree
-import numpy as np
-
 import matplotlib.pyplot as plt
+import numpy as np
+import os
+import re
+import sqlite3
+import sys
 import time
 import zipfile
 
-import datasetHelper
+from multiprocessing import Pool
+from multiprocessing import cpu_count
+from sklearn import tree
+from types import SimpleNamespace
 
+import datasetHelper
 
 def ensureMovieYearGenresFile(dataFolder, movieYearGenresFileName):
 	if os.path.isfile(os.path.join(dataFolder, movieYearGenresFileName)):
@@ -65,6 +67,7 @@ def ensureMovieYearGenresFile(dataFolder, movieYearGenresFileName):
 				map[index] = 1
 
 			writer.writerow([id, item.year] + map)
+
 
 def ensureMovieYearGenresTable(movieYearGenresFileName, dbConnection):
 	cur = dbConnection.cursor()
@@ -177,7 +180,7 @@ where TestRatings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentifier(g)
 	cursor.executemany('update TestRatings set predict=? where userId=? and movieId=?', toDB.tolist())
 
 
-def classifyUser(con, userId):
+def classifyForUser(con, userId):
 	cur = con.cursor()
 
 	clf = tree.DecisionTreeClassifier()
@@ -199,11 +202,13 @@ where ValidationRatings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentif
 	con.commit()
 	predictTest(cur, userId, clf)
 	con.commit()
-	# cur.execute('select count(*) from ValidationRatings where userId=? and rating=predict', (userId,))
-	# correct = cur.fetchone()[0]
-	# # break
-	# print('user {0}, accuracy is {1:.2f}.'.format(userId, correct / len(predictY)))  # prefer format than %.
-	# print('User {0} is done.'.format(userId))
+
+
+# cur.execute('select count(*) from ValidationRatings where userId=? and rating=predict', (userId,))
+# correct = cur.fetchone()[0]
+# # break
+# print('user {0}, accuracy is {1:.2f}.'.format(userId, correct / len(predictY)))  # prefer format than %.
+# print('User {0} is done.'.format(userId))
 
 
 def dealWithMissingPrediction(cursor, table: str):
@@ -213,12 +218,45 @@ def dealWithMissingPrediction(cursor, table: str):
 
 def exportTestRatings(cursor, fileName: str):
 	cursor.execute('select rowid-1, predict from TestRatings order by rowid')
-	data=cursor.fetchall()
+	data = cursor.fetchall()
 	with open(os.path.join(DATA_FOLDER, fileName), 'w', newline="") as f:
 		writer = csv.writer(f, delimiter=',')
 		writer.writerow(['Id', 'rating'])
 
 		writer.writerows(data)
+
+
+def classifyForUsersInThread(threadId, userIds):
+	assert threadId > 0
+
+	with dbHelper.getConnection(os.path.join(DATA_FOLDER, "sqlite.db")) as con:
+		startTime = time.time()
+		lastP = 0
+		total = len(userIds)
+		for i in range(total):
+			try:
+				classifyForUser(con, userIds[i])
+			except sqlite3.OperationalError as ex:
+				print(ex,file=sys.stderr)
+				exit(1)
+			except Exception as ex:
+				print(ex, file=sys.stderr)
+
+			p = i * 100 // total
+			if p > lastP:
+				usedTime = time.time() - startTime
+				print('[Thread {4}] User {0} is done. Progress is {1}%. Used time is {2}s, Remaining time is {3:d}s.'.
+					  format(userIds[i], p, int(usedTime), int(usedTime / p * 100 - usedTime), threadId))
+				lastP = p
+
+
+
+def chunkify(l, n):
+	"""Yield n number of sequential chunks from l."""
+	d, r = divmod(len(l), n)
+	for i in range(n):
+		si = (d + 1) * (i if i < r else r) + d * (0 if i < r else i - r)
+		yield l[si:si + (d + 1 if i < r else d)]
 
 
 def main():
@@ -242,25 +280,23 @@ def main():
 
 	cur = con.cursor()
 
-	# cur.execute('update ValidationRatings set predict=null')
-	# cur.execute('update TestRatings set predict=null')
-	# con.commit()
+	cur.execute('update ValidationRatings set predict=null')
+	cur.execute('update TestRatings set predict=null')
+	con.commit()
 
 	cur.execute('select distinct userId from ValidationRatings')
 	userIds = [row[0] for row in cur.fetchall()]
 
 	startTime = time.time()
 
-	lastP = 0
-	total = len(userIds)
-	for i in range(total):
-		classifyUser(con, userIds[i])
+	chunkedUserIds = list(chunkify(userIds, cpu_count()))
+	pool = Pool(len(chunkedUserIds))
 
-		p = i * 100 // total
-		if p > lastP:
-			usedTime = time.time() - startTime
-			print('User {0} is done. Progress is {1}%. Used time is {2}s, Remaining time is {3:d}s'.format(i, p, int(usedTime), int(usedTime / p * 100 - usedTime)))
-			lastP = p
+	for i in range(len(chunkedUserIds)):
+		pool.apply_async(classifyForUsersInThread, args=(i + 1, chunkedUserIds[i]))
+
+	pool.close()
+	pool.join()
 
 	dealWithMissingPrediction(cur, 'ValidationRatings')
 	dealWithMissingPrediction(cur, 'TestRatings')
