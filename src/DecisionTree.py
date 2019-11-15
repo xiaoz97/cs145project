@@ -257,8 +257,16 @@ where ValidationRatings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentif
 
 
 def dealWithMissingPrediction(cursor, table: str):
-	cursor.execute('update {0} set predict=? where predict is null'.format(table), (1,))
-	print('Fixed {0} empty prediction in table {1}.'.format(cursor.rowcount, table))
+	cursor.execute('select userID from {0} where predict is null'.format(table))
+
+	userIds =[row[0] for row in cursor.fetchall()]
+
+	for userId in userIds:
+		p = getMajorityRating(cursor, userId)
+		cursor.execute('update {0} set predict=? where userId=?'.format(table), (p, userId))
+
+
+	# print('Fixed {0} empty prediction in table {1}.'.format(cursor.rowcount, table))
 
 
 def exportTestRatings(cursor, fileName: str):
