@@ -1,33 +1,31 @@
 import os,sys
 import pandas as pd
-import json
+import numpy as np
+import pickle
 
 # 文件夹地址
-data_folder = 'D:/study/Data_Mining/proj/1m'
+#data_folder = 'D:/study/Data_Mining/proj/1m'
+data_folder = "E:/pycharm/cs145project/data"
 # 文件地址
-ratings_filename = data_folder+'/ratings.dat'
+ratings_filename = data_folder+'/train_ratings_binary.csv'
 # 给u.data 加标题行
-all_ratings = pd.read_csv(ratings_filename, delimiter="::", header=None, names= ["UserID","MovieID","Rating","Datetime"])
-# 改变时间显示
-all_ratings["Datetime"] = pd.to_datetime(all_ratings['Datetime'], unit='s')
-# 添加一个特征，即评分大于3的定义为喜欢，小于3的定义为不喜欢
-all_ratings["Favorable"] = all_ratings["Rating"]>3
-# 提取前200个数据作为训练集
-ratings = all_ratings[all_ratings['UserID'].isin(range(200))]
-# 新建一个数据集，只包括用户喜欢某部电影的数据行
-favorable_ratings = ratings[ratings["Favorable"]]
-# 统计每个用户各喜欢哪些电影，按照UserID进行分组，并遍历每个用户看过的每一部电影
-favorable_reviews_by_users = dict((k, frozenset(v.values)) for k,v in favorable_ratings.groupby("UserID")["MovieID"])
+all_ratings = pd.read_csv(ratings_filename)
 
+# 新建一个数据集，只包括用户喜欢某部电影的数据行
+favorable_ratings = all_ratings[all_ratings["rating"]==1]
+
+# 统计每个用户各喜欢哪些电影，按照UserID进行分组，并遍历每个用户看过的每一部电影
+favorable_reviews_by_users = dict((k, frozenset(v.values)) for k,v in favorable_ratings.groupby("userId")["movieId"])
 # 创建一个数据框，以便了解每部电影的影迷数量
-num_favorable_by_movie = ratings[["MovieID", "Favorable"]].groupby("MovieID").sum()
+num_favorable_by_movie = all_ratings[["movieId", "rating"]].groupby("movieId").sum()
 # 初始化一个字典
 frequent_itemsets = {}
 # 设置最小支持度
 min_support = 50
 # 为每一部电影生成只包含它自己的项目，检测它是否够频繁
 # numnum_favorable_by_movie.iterrows() 对数据进行遍历
-frequent_itemsets[1] = dict((frozenset((movie_id,)),row["Favorable"]) for movie_id, row in num_favorable_by_movie.iterrows() if row["Favorable"] > min_support )
+frequent_itemsets[1] = dict((frozenset((movie_id,)),row["rating"]) for movie_id, row in num_favorable_by_movie.iterrows() if row["rating"] > min_support )
+
 # 导入字典
 from collections import defaultdict
 # 定义一个发现新的频繁项集的函数，参数为（每个用户喜欢哪些电影字典，上一个频繁项集，最小支持度）
@@ -100,8 +98,10 @@ from operator import itemgetter
 # 对执行度进行排序，输出置信度最高的前5条规则
 sorted_confidence = sorted(rule_confidence.items(), key=itemgetter(1), reverse=True)
 
-filename="rules"
+filename="rules.file"
+print(len(sorted_confidence))
 
-with open(filename+'.json','a') as outfile:
-    json.dump(sorted_confidence,outfile,ensure_ascii=False)
-    outfile.write('\n')
+#with open('rules.txt', 'w') as fp:
+#    fp.write('\n'.join('{} {}' %(x,y) for premise, conclusion in sorted_confidence))
+
+np.save('sorted_confidence.npy', sorted_confidence)
