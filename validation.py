@@ -26,6 +26,7 @@ print("start")
 for index, row in validate.iterrows():
     #cnt标记prediction total为总数
     cnt=0
+
     total+=1
     for rules,confidence in sorted_confidence:
         #遍历已获取的规则，如果conclusion与当前需判断的电影相同，则判断premise是否在用户已经看过的电影中
