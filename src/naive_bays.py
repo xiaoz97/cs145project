@@ -1,10 +1,21 @@
+import os
 import pandas as pd
 from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score
 
+import datasetHelper
+import generate_movieRatings
+
+
+dataFolder = datasetHelper.getDataset()
+
+if os.path.isfile(os.path.join(dataFolder, 'train_movies_ratings.csv')) == False or \
+		os.path.isfile(os.path.join(dataFolder, 'val_movies_ratings.csv')) == False:
+	generate_movieRatings.mergeCsv(dataFolder)
+
 # read the train and test dataset
-train_data = pd.read_csv('train_movies_ratings.csv')
-test_data = pd.read_csv('val_movies_ratings.csv')
+train_data = pd.read_csv(os.path.join(dataFolder, 'train_movies_ratings.csv'))
+test_data = pd.read_csv(os.path.join(dataFolder, 'val_movies_ratings.csv'))
 
 # shape of the dataset
 #print('Shape of training data :',train_data.shape)
