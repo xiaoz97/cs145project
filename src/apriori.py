@@ -3,9 +3,16 @@ import pandas as pd
 import numpy as np
 import pickle
 
+
+DATA_FOLDER = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../data")
+try:
+    i = sys.argv.index('--data-folder')
+    DATA_FOLDER = int(sys.argv[i + 1])
+except:
+    pass
+
 # 文件夹地址
-#data_folder = 'D:/study/Data_Mining/proj/1m'
-data_folder = "E:/pycharm/cs145project/data"
+data_folder = DATA_FOLDER
 # 文件地址
 ratings_filename = data_folder+'/train_ratings_binary.csv'
 # 给u.data 加标题行
