@@ -5,6 +5,9 @@ import pandas as pd
 import numpy as np
 import pickle
 
+import mlxtend.frequent_patterns
+from mlxtend.preprocessing import TransactionEncoder
+
 
 DATA_FOLDER = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../data")
 try:
@@ -24,6 +27,26 @@ all_ratings = pd.read_csv(ratings_filename)
 favorable_ratings = all_ratings[all_ratings["rating"]==1]
 
 # 统计每个用户各喜欢哪些电影，按照UserID进行分组，并遍历每个用户看过的每一部电影
+
+dataset = [v.values for _, v in favorable_ratings.groupby("userId")["movieId"]]
+# In dataset, each row is a transaction, ie. movies liked by the same user.
+# The length of each row is different.
+
+te = TransactionEncoder()
+te_ary = te.fit(dataset).transform(dataset)
+encodedDataset = pd.DataFrame(te_ary, columns=te.columns_)
+# Now, each row has columns of all movies.
+# If a user liked one movie, the corresponding column is true.
+
+assert len(dataset[0]) == encodedDataset.iloc[0].sum()
+
+
+frequentPatterns = mlxtend.frequent_patterns.apriori(encodedDataset, min_support=0.2)
+
+print(frequentPatterns)
+
+exit()
+
 favorable_reviews_by_users = dict((k, frozenset(v.values)) for k,v in favorable_ratings.groupby("userId")["movieId"])
 # 创建一个数据框，以便了解每部电影的影迷数量
 num_favorable_by_movie = all_ratings[["movieId", "rating"]].groupby("movieId").sum()
