@@ -16,6 +16,9 @@ if os.path.isfile(os.path.join(dataFolder, 'train_movies_ratings.csv')) == False
 		os.path.isfile(os.path.join(dataFolder, 'val_movies_ratings.csv')) == False:
 	generate_movieRatings.mergeCsv(dataFolder)
 
+
+print('Reading data.')
+
 # read the train and test dataset
 train_data = pd.read_csv(os.path.join(dataFolder, 'train_movies_ratings.csv'))
 test_data = pd.read_csv(os.path.join(dataFolder, 'val_movies_ratings.csv'))
