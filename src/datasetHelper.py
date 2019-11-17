@@ -8,7 +8,7 @@ def getDataset(dataFolder=None):
 		dataFolder = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../data")
 		try:
 			i = sys.argv.index('--data-folder')
-			dataFolder = int(sys.argv[i + 1])
+			dataFolder = sys.argv[i + 1]
 		except:
 			pass
 
