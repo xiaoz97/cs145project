@@ -4,10 +4,13 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score
 
 import datasetHelper
+import DecisionTree
 import generate_movieRatings
 
 
 dataFolder = datasetHelper.getDataset()
+
+DecisionTree.ensureMovieYearGenresFile(dataFolder, 'movies-year-genres.csv')
 
 if os.path.isfile(os.path.join(dataFolder, 'train_movies_ratings.csv')) == False or \
 		os.path.isfile(os.path.join(dataFolder, 'val_movies_ratings.csv')) == False:
@@ -33,6 +36,8 @@ test_x = test_data.drop(columns=['rating'],axis=1)
 test_y = test_data['rating']
 
 model = GaussianNB()
+
+print('Start fitting model.')
 
 # fit the model with the training data
 model.fit(train_x,train_y)

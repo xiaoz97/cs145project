@@ -15,13 +15,13 @@ import time
 import zipfile
 
 
-def ensureMovieYearGenresFile(movieYearGenresFileName):
-	if os.path.isfile(os.path.join(DATA_FOLDER, movieYearGenresFileName)):
+def ensureMovieYearGenresFile(dataFolder, movieYearGenresFileName):
+	if os.path.isfile(os.path.join(dataFolder, movieYearGenresFileName)):
 		return
 
 	movies = {}
 	global ALL_GENRES
-	with open(DATA_FOLDER + "/movies.csv", encoding='utf-8') as moviesFile:  # will automatically close the file when exit the with block
+	with open(dataFolder + "/movies.csv", encoding='utf-8') as moviesFile:  # will automatically close the file when exit the with block
 		reader = csv.reader(moviesFile)
 		next(reader)  # skip the column headers
 		for row in reader:
@@ -52,7 +52,7 @@ def ensureMovieYearGenresFile(movieYearGenresFileName):
 
 	# print(', '.join(allGenres))
 
-	with open(DATA_FOLDER + "/" + movieYearGenresFileName, encoding='utf-8', mode='w', newline='') as f:
+	with open(dataFolder + "/" + movieYearGenresFileName, encoding='utf-8', mode='w', newline='') as f:
 		writer = csv.writer(f)
 		writer.writerow(['id', 'year'] + ALL_GENRES)
 		for id in movies:
@@ -243,7 +243,7 @@ def main():
 				z.extractall(DATA_FOLDER)
 
 	movieYearGenresFileName = 'movies-year-genres.csv'
-	ensureMovieYearGenresFile(movieYearGenresFileName)
+	ensureMovieYearGenresFile(DATA_FOLDER, movieYearGenresFileName)
 
 	con = dbHelper.getConnection(os.path.join(DATA_FOLDER, "sqlite.db"))
 	ensureMovieYearGenresTable(movieYearGenresFileName, con)
