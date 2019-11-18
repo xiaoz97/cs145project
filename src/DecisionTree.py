@@ -246,7 +246,10 @@ def main():
 	# cur.execute('update TestRatings set predict=null')
 	# con.commit()
 
-	cur.execute('select distinct userId from ValidationRatings')
+	cur.execute('''
+SELECT userid FROM ValidationRatings
+UNION
+SELECT userId FROM TestRatings''')
 	userIds = [row[0] for row in cur.fetchall()]
 
 	startTime = time.time()
