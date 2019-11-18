@@ -8,7 +8,6 @@ import mysql.connector
 import numpy as np
 import os
 import re
-import sqlite3
 import sys
 import time
 import zipfile
@@ -299,25 +298,27 @@ def exportTestRatings(cursor, fileName: str):
 def classifyForUsersInThread(threadId, userIds):
 	assert threadId > 0
 
-	with dbHelper.getConnection(os.path.join(DATA_FOLDER, "sqlite.db")) as con:
-		startTime = time.time()
-		lastP = 0
-		total = len(userIds)
-		for i in range(total):
-			try:
-				classifyForUser(con, userIds[i])
-			except sqlite3.OperationalError as ex:
-				print(ex,file=sys.stderr)
-				exit(1)
-			except Exception as ex:
-				print(ex, file=sys.stderr)
+	con = dbHelper.getConnection()
+	startTime = time.time()
+	lastP = 0
+	total = len(userIds)
+	for i in range(total):
+		try:
+			classifyForUser(con, userIds[i])
+		except mysql.connector.Error as ex:
+			print(ex, file=sys.stderr)
+			exit(1)
+		except Exception as ex:
+			print(ex, file=sys.stderr)
 
-			p = i * 100 // total
-			if p > lastP:
-				usedTime = time.time() - startTime
-				print('[Thread {4}] User {0} is done. Progress is {1}%. Used time is {2}s, Remaining time is {3:d}s.'.
-					  format(userIds[i], p, int(usedTime), int(usedTime / p * 100 - usedTime), threadId))
-				lastP = p
+		p = i * 100 // total
+		if p > lastP:
+			usedTime = time.time() - startTime
+			print('[Thread {4}] User {0} is done. Progress is {1}%. Used time is {2}s, Remaining time is {3:d}s.'.
+				  format(userIds[i], p, int(usedTime), int(usedTime / p * 100 - usedTime), threadId))
+			lastP = p
+
+	con.close()
 
 
 def errorOnClassifyForUsersInThread(ex):
