@@ -383,6 +383,9 @@ SELECT userId FROM TestRatings''')
 		pool.close()
 		pool.join()
 
+	# set InnoDB buffer size to 3GB.
+	# If the buffer size is small, MySQL may throw exception "The total number of locks exceeds the lock table size".
+	cur.execute('SET GLOBAL innodb_buffer_pool_size=67108864;')
 	dealWithMissingPrediction(cur, 'ValidationRatings')
 	dealWithMissingPrediction(cur, 'TestRatings')
 
