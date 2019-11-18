@@ -3,7 +3,7 @@ import sys
 import zipfile
 
 
-def getDataset(dataFolder=None):
+def getDataset(dataFolder=None) -> str:
 	if dataFolder is None:
 		dataFolder = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../data")
 		try:
