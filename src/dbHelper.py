@@ -1,4 +1,3 @@
-
 import mysql.connector
 
 
@@ -11,5 +10,5 @@ def delimiteDBIdentifier(identifier: str) -> str:
 	return '`' + identifier + '`'
 
 
-def getConnection(database):
-	return mysql.connector.connect(database)  # we may use ":memory:", but it may be too large, about 1.5GB
+def getConnection():
+	return mysql.connector.connect(user='root', password='root', host='127.0.0.1', database='data_mining')

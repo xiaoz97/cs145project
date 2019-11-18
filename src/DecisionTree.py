@@ -76,6 +76,9 @@ def ensureMovieYearGenresTable(movieYearGenresFileName, dbConnection):
 	if dbHelper.doesTableExist(TABLE_NAME, cur):
 		return
 
+	# CSV文件及路径最好以英文命名。中文名称经测试无法正确执行。
+	# https://www.jianshu.com/p/dc94471d6778
+
 	# Syntax 'create table if not exists' exists, but we don't know if we need to insert rows.
 	with open(os.path.join(DATA_FOLDER, movieYearGenresFileName), encoding='utf-8') as movieYearGenresFile:
 		csvReader = csv.reader(movieYearGenresFile)
@@ -87,9 +90,18 @@ def ensureMovieYearGenresTable(movieYearGenresFileName, dbConnection):
 		# table names can't be the target of parameter substitution
 		# https://stackoverflow.com/a/3247553/746461
 
-		to_db = [row for row in csvReader]
+		# to_db = [row for row in csvReader]
 
-		cur.executemany("INSERT INTO {1} VALUES ({0});".format(','.join(['%s'] * len(headers)), TABLE_NAME), to_db)
+		# cur.executemany("INSERT INTO {1} VALUES ({0});".format(','.join(['%s'] * len(headers)), TABLE_NAME), to_db)
+
+		# unable to execute statements in a single execute() call, which throws exception "Commands out of sync" even though I pass in multi=True.
+		cur.execute('set session max_execution_time=1800000')
+		cur.execute('''
+LOAD DATA INFILE '{0}' INTO TABLE {1}
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\r\n'
+IGNORE 1 LINES;'''.format(repr(os.path.join(DATA_FOLDER, movieYearGenresFileName))[1:-1], TABLE_NAME),
+			multi=True)
 		dbConnection.commit()
 
 	cur.execute('select * from {0} where id=131162'.format(TABLE_NAME))
@@ -103,20 +115,14 @@ def ensureRatingsTable(fileName, dbConnection):
 		return
 
 	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL,rating INTEGER NOT NULL, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
-	with open(os.path.join(DATA_FOLDER, fileName), encoding='utf-8') as f:
-		csvReader = csv.reader(f)
-		next(csvReader)
+	cur.execute('set session max_execution_time=1800000')
+	cur.execute('''
+LOAD DATA INFILE '{0}' INTO TABLE {1}
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+IGNORE 1 LINES;'''.format(repr(os.path.join(DATA_FOLDER, fileName))[1:-1], TABLE_NAME))
 
-		to_db = [row for row in csvReader]
-
-
-		to_db = [tuple(item) for item in to_db]
-		for i in range(len(to_db) // dbHelper.MAX_INSERT_ROWS):
-			values = ', '.join(map(str, to_db[dbHelper.MAX_INSERT_ROWS * i:dbHelper.MAX_INSERT_ROWS * i + dbHelper.MAX_INSERT_ROWS - 1]))
-			query = "INSERT INTO {0} VALUES {1}".format(TABLE_NAME, values)
-			cur.execute(query)
-
-		dbConnection.commit()
+	dbConnection.commit()
 
 	cur.execute('select * from {0} where userId=1 and movieId=151'.format(TABLE_NAME))
 	print(cur.fetchone())
@@ -128,15 +134,17 @@ def ensureValidationRatingsTable(fileName, dbConnection):
 	if dbHelper.doesTableExist(TABLE_NAME, cur):
 		return
 
-	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL,rating INTEGER NOT NULL, predict INTEGER, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
-	with open(os.path.join(DATA_FOLDER, fileName), encoding='utf-8') as f:
-		csvReader = csv.reader(f)
-		next(csvReader)
+	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL,rating INTEGER NOT NULL, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
+	cur.execute('set session max_execution_time=1800000')
+	cur.execute('''
+LOAD DATA INFILE '{0}' INTO TABLE {1}
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+IGNORE 1 LINES;'''.format(repr(os.path.join(DATA_FOLDER, fileName))[1:-1], TABLE_NAME))
 
-		to_db = [row for row in csvReader]
+	cur.execute('ALTER TABLE {0} ADD COLUMN predict TINYINT NULL'.format(TABLE_NAME))
 
-		cur.executemany("INSERT INTO {0} VALUES (%s,%s,%s,null);".format(TABLE_NAME), to_db)
-		dbConnection.commit()
+	dbConnection.commit()
 
 	cur.execute('select * from {0} where userId=1 and movieId=1653'.format(TABLE_NAME))
 	print(cur.fetchone())
@@ -148,15 +156,16 @@ def ensureTestRatingTable(fileName, dbConnection):
 	if dbHelper.doesTableExist(TABLE_NAME, cur):
 		return
 
-	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL, predict integer, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
-	with open(os.path.join(DATA_FOLDER, fileName), encoding='utf-8') as f:
-		csvReader = csv.reader(f)
-		next(csvReader)
+	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
+	cur.execute('set session max_execution_time=1800000')
+	cur.execute('''
+LOAD DATA INFILE '{0}' INTO TABLE {1}
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+IGNORE 1 LINES;'''.format(repr(os.path.join(DATA_FOLDER, fileName))[1:-1], TABLE_NAME))
 
-		to_db = [row for row in csvReader]
-
-		cur.executemany("INSERT INTO {0} VALUES (%s,%s, null);".format(TABLE_NAME), to_db)
-		dbConnection.commit()
+	cur.execute('ALTER TABLE {0} ADD COLUMN predict TINYINT NULL'.format(TABLE_NAME))
+	dbConnection.commit()
 
 
 def trainClassifier(cursor, userId, clf):
@@ -332,7 +341,7 @@ def main():
 	movieYearGenresFileName = 'movies-year-genres.csv'
 	ensureMovieYearGenresFile(DATA_FOLDER, movieYearGenresFileName)
 
-	con = dbHelper.getConnection((user='root', password='root', host='127.0.0.1', database='data_mining'))
+	con = dbHelper.getConnection()
 	ensureMovieYearGenresTable(movieYearGenresFileName, con)
 	ensureRatingsTable('train_ratings_binary.csv', con)
 	ensureValidationRatingsTable('val_ratings_binary.csv', con)
