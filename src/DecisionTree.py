@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 import time
 import zipfile
 
+import datasetHelper
+
 
 def ensureMovieYearGenresFile(dataFolder, movieYearGenresFileName):
 	if os.path.isfile(os.path.join(dataFolder, movieYearGenresFileName)):
@@ -227,20 +229,7 @@ def main():
 	except:
 		MAX_ROWS = None
 
-	try:
-		i = sys.argv.index('--data-folder')
-		DATA_FOLDER = int(sys.argv[i + 1])
-	except:
-		pass
-
-	if os.path.isfile(os.path.join(DATA_FOLDER, 'movies.csv')) is False:
-		if os.system('kaggle competitions download -c uclacs145fall2019 -p "{0}"'.format(DATA_FOLDER)) != 0:
-			print("Unable to download dataset through kaggle API. Did you install the API and configure your API key properly?", file=sys.stderr)
-			print("Alternatively, you can specify the folder of the dataset with --data-folder.", file=sys.stderr)
-			exit(1)
-		else:
-			with zipfile.ZipFile(os.path.join(DATA_FOLDER, 'uclacs145fall2019.zip'), 'r') as z:
-				z.extractall(DATA_FOLDER)
+	DATA_FOLDER = datasetHelper.getDataset()
 
 	movieYearGenresFileName = 'movies-year-genres.csv'
 	ensureMovieYearGenresFile(DATA_FOLDER, movieYearGenresFileName)
