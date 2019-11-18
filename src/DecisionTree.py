@@ -320,6 +320,10 @@ def classifyForUsersInThread(threadId, userIds):
 				lastP = p
 
 
+def errorOnClassifyForUsersInThread(ex):
+	print(ex, file=sys.stderr)
+	exit(1)
+
 
 def chunkify(l, n):
 	"""Yield n number of sequential chunks from l."""
@@ -378,7 +382,7 @@ SELECT userId FROM TestRatings''')
 		pool = Pool(len(chunkedUserIds))
 
 		for i in range(len(chunkedUserIds)):
-			pool.apply_async(classifyForUsersInThread, args=(i + 1, chunkedUserIds[i]))
+			pool.apply_async(classifyForUsersInThread, args=(i + 1, chunkedUserIds[i]), error_callback=errorOnClassifyForUsersInThread)
 
 		pool.close()
 		pool.join()
