@@ -85,7 +85,7 @@ def ensureMovieYearGenresTable(movieYearGenresFileName, dbConnection):
 		headers = next(csvReader)
 
 		headers[0] = headers[0] + ' INTEGER NOT NULL PRIMARY KEY'
-		headers = headers[0:1] + [dbHelper.delimiteDBIdentifier(h) + ' INTEGER' for h in headers[1:]]
+		headers = headers[0:1] + ['year integer not null'] + [dbHelper.delimiteDBIdentifier(h) + ' TINYINT not null' for h in headers[2:]]
 		cur.execute("CREATE TABLE {1} ({0})".format(', '.join(headers), TABLE_NAME))
 		# table names can't be the target of parameter substitution
 		# https://stackoverflow.com/a/3247553/746461
@@ -101,7 +101,7 @@ LOAD DATA INFILE '{0}' INTO TABLE {1}
 FIELDS TERMINATED BY ','
 LINES TERMINATED BY '\r\n'
 IGNORE 1 LINES;'''.format(repr(os.path.join(DATA_FOLDER, movieYearGenresFileName))[1:-1], TABLE_NAME),
-			multi=True)
+					multi=True)
 		dbConnection.commit()
 
 	cur.execute('select * from {0} where id=131162'.format(TABLE_NAME))
@@ -114,7 +114,7 @@ def ensureRatingsTable(fileName, dbConnection):
 	if dbHelper.doesTableExist(TABLE_NAME, cur):
 		return
 
-	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL,rating INTEGER NOT NULL, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
+	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL,rating TINYINT NOT NULL, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
 	cur.execute('set session max_execution_time=1800000')
 	cur.execute('''
 LOAD DATA INFILE '{0}' INTO TABLE {1}
@@ -134,7 +134,7 @@ def ensureValidationRatingsTable(fileName, dbConnection):
 	if dbHelper.doesTableExist(TABLE_NAME, cur):
 		return
 
-	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL,rating INTEGER NOT NULL, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
+	cur.execute("CREATE TABLE {0} (userId INTEGER NOT NULL,movieId INTEGER NOT NULL,rating TINYINT NOT NULL, PRIMARY KEY(userId,movieId))".format(TABLE_NAME))
 	cur.execute('set session max_execution_time=1800000')
 	cur.execute('''
 LOAD DATA INFILE '{0}' INTO TABLE {1}
@@ -172,7 +172,7 @@ def trainClassifier(cursor, userId, clf):
 	cursor.execute('''
 SELECT Ratings.rating, MovieYearGenres.year, {0} FROM Ratings
 join MovieYearGenres on Ratings.movieId=MovieYearGenres.id
-where Ratings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentifier(g) for g in ALL_GENRES])), (userId,))
+where Ratings.userId=%s'''.format(','.join([dbHelper.delimiteDBIdentifier(g) for g in ALL_GENRES])), (userId,))
 	trainingData = np.array(cursor.fetchall())
 	if len(trainingData) == 0:
 		raise Exception('User {0} does not appear in training set.'.format(userId))
@@ -185,7 +185,7 @@ def predictTest(cursor, userId, clf):
 	cursor.execute('''
 SELECT TestRatings.movieId, MovieYearGenres.year, {0} FROM TestRatings
 join MovieYearGenres on TestRatings.movieId=MovieYearGenres.id
-where TestRatings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentifier(g) for g in ALL_GENRES])), (userId,))
+where TestRatings.userId=%s'''.format(','.join([dbHelper.delimiteDBIdentifier(g) for g in ALL_GENRES])), (userId,))
 	testingData = np.array(cursor.fetchall())
 	predictY = clf.predict(testingData[:, 1:])
 
@@ -249,7 +249,7 @@ def classifyForUser(con, userId):
 	cur.execute('''
 SELECT ValidationRatings.movieId, MovieYearGenres.year, {0} FROM ValidationRatings
 join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
-where ValidationRatings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentifier(g) for g in ALL_GENRES])), (userId,))
+where ValidationRatings.userId=%s'''.format(','.join([dbHelper.delimiteDBIdentifier(g) for g in ALL_GENRES])), (userId,))
 	validationData = np.array(cur.fetchall())
 	predictY = clf.predict(validationData[:, 1:])
 	toDB = predictY[:, None]
@@ -279,7 +279,7 @@ def dealWithMissingPrediction(cursor, table: str):
 
 	for userId in userIds:
 		p = getMajorityRating(cursor, userId)
-		cursor.execute('update {0} set predict=? where userId=?'.format(table), (p, userId))
+		cursor.execute('update {0} set predict=%s where userId=%s'.format(table), (p, userId))
 
 
 	# print('Fixed {0} empty prediction in table {1}.'.format(cursor.rowcount, table))
