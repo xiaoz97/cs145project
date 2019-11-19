@@ -277,7 +277,7 @@ def exportTestRatings(cursor, fileName: str):
 def classifyForUsersInThread(threadId, userIds):
 	assert threadId > 0
 
-	with dbHelper.getConnection(os.path.join(DATA_FOLDER, "sqlite.db")) as con:
+	with dbHelper.getConnection() as con:
 		startTime = time.time()
 		lastP = 0
 		total = len(userIds)

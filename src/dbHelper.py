@@ -12,4 +12,4 @@ def delimiteDBIdentifier(identifier: str) -> str:
 
 
 def getConnection():
-	return pyodbc.connect('DRIVER={SQL Server};SERVER=DESKTOP-FHIBPCT;DATABASE=data_mining;Trusted_Connection=yes')
+	return pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=data_mining;UID=sa;PWD=yourStrong(!)Password;')
