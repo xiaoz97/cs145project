@@ -450,14 +450,26 @@ SELECT userId FROM TestRatings''')
 
 	startTime = time.time()
 
-	chunkedUserIds = list(chunkify(userIds, cpu_count()))
-	pool = Pool(len(chunkedUserIds))
+	try:
+		i = sys.argv.index('--parallel')
+		if sys.argv[i + 1] == 'auto':
+			parallel = cpu_count()
+		else:
+			parallel = int(sys.argv[i + 1])
+	except:
+		parallel = 1
 
-	for i in range(len(chunkedUserIds)):
-		pool.apply_async(classifyForUsersInThread, args=(i + 1, chunkedUserIds[i]))
+	if parallel == 1:
+		classifyForUsersInThread(1, userIds)
+	else:
+		chunkedUserIds = list(chunkify(userIds, cpu_count()))
+		pool = Pool(len(chunkedUserIds))
 
-	pool.close()
-	pool.join()
+		for i in range(len(chunkedUserIds)):
+			pool.apply_async(classifyForUsersInThread, args=(i + 1, chunkedUserIds[i]))
+
+		pool.close()
+		pool.join()
 
 	dealWithMissingPrediction(cur, 'ValidationRatings')
 	dealWithMissingPrediction(cur, 'TestRatings')
