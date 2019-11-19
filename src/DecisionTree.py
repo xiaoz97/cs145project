@@ -207,7 +207,7 @@ def getMajorityRating(cur, userId=None):
 	if userId is not None:
 		cur.execute('''
 SELECT rating, count(*) FROM Ratings
-where Ratings.userId=?
+where Ratings.userId=%s
 GROUP by rating
 order by rating''', (userId,))
 	else:
@@ -287,7 +287,7 @@ def dealWithMissingPrediction(cursor, table: str):
 def exportTestRatings(cursor, fileName: str):
 	cursor.execute('select predict from TestRatings order by userId,movieId')
 	data = cursor.fetchall()
-	data = [[i] + data[i] for i in range(len(data))]
+	data = [[i] + list(data[i]) for i in range(len(data))]
 	with open(os.path.join(DATA_FOLDER, fileName), 'w', newline="") as f:
 		writer = csv.writer(f, delimiter=',')
 		writer.writerow(['Id', 'rating'])
@@ -403,7 +403,7 @@ SELECT userId FROM TestRatings''')
 	except:
 		pass
 
-	cur.execute('''select t.correct, t.total, CAST(t.correct AS float)/t.total as accuracy
+	cur.execute('''select t.correct, t.total, t.correct/t.total as accuracy
 from (Select 
 (select count(*) from ValidationRatings where rating=predict) as correct,
 (select count(*) from ValidationRatings) as total) as t''')
