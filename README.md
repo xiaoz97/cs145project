@@ -1,15 +1,10 @@
 # CS 145 Project
 
-work hard
+## Decision Tree
 
-测试内容
+`./DecisionTree.py`
 
-=======
-Tim
+`--parallel x`:
 
-zx
+If the option is not specified, the program uses 1 thread/process. If x is an integer, the program uses x threads/processes. If x is `auto`, the program will determine the proper number of threads.
 
-xinyi
->>>>>>> origin/master
-
-kelly
