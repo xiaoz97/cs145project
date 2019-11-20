@@ -15,7 +15,7 @@ import generate_movieRatings
 def trainModel():
 	train_data = pd.read_csv(os.path.join(dataFolder, 'train_movies_ratings.csv'))
 	# seperate the independent and target variable on training data
-	train_x = train_data.drop(columns=['rating'], axis=1)
+	train_x = train_data.drop(columns=['userId', 'movieId', 'rating'], axis=1)
 	train_y = train_data['rating']
 	model = GaussianNB()
 	# fit the model with the training data
@@ -35,7 +35,7 @@ def predictValidation(model):
 	# read the train and test dataset
 	validation_data = pd.read_csv(os.path.join(dataFolder, 'val_movies_ratings.csv'))
 	# seperate the independent and target variable on testing data
-	validation_x = validation_data.drop(columns=['rating'], axis=1)
+	validation_x = validation_data.drop(columns=['userId', 'movieId', 'rating'], axis=1)
 	validation_y = validation_data['rating']
 
 	# predict the target on the test dataset
@@ -66,7 +66,7 @@ predictValidation(model)
 
 print('Running on test data...')
 test_x = pd.read_csv(os.path.join(dataFolder, 'test_movies_ratings.csv'))
-predict_test = model.predict(test_x)
+predict_test = model.predict(test_x.drop(columns=['userId', 'movieId', 'rating'], axis=1))
 #
 # predict_test = numpy.array([1, 1, 0, 0, 0])
 
