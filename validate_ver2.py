@@ -2,7 +2,7 @@ import os,sys
 import pandas as pd
 import numpy as np
 #读入之前获取的sorted rules
-sorted_confidence=np.load("fp.npy",allow_pickle=True)
+sorted_confidence=np.load("fp1.npy",allow_pickle=True)
 #d读入validation set
 validate_folder="E:/pycharm/cs145project/data"
 
@@ -42,6 +42,12 @@ for index, row in validate.iterrows():
             a.remove(row["movieId"])
             #print(a)
             if set(a)<set(user_likes):
+                cnt=1
+                if(cnt==row["rating"]):
+                    print("right")
+                if(cnt!=row["rating"]):
+                    print("wrong")
+                break
                 
     #如果不符合任何conclusion以及premise，暂时产生0，1随机数
     if(cnt==0):

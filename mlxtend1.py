@@ -32,9 +32,11 @@ encodedDataset = pd.DataFrame(te_ary, columns=te.columns_)
 assert len(dataset[0]) == encodedDataset.iloc[0].sum()
 
 
-frequentPatterns = mlxtend.frequent_patterns.apriori(encodedDataset, min_support=0.2)
+frequentPatterns = mlxtend.frequent_patterns.apriori(encodedDataset, min_support=0.1)
 
 print(frequentPatterns)
+
+np.save("fp1.npy",frequentPatterns)
 
 exit()
 
