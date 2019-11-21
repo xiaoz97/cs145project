@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import bitstring
 import os
 import csv
 import dbHelper
@@ -56,15 +57,15 @@ def ensureMovieYearGenresFile(dataFolder, movieYearGenresFileName):
 
 	with open(dataFolder + "/" + movieYearGenresFileName, encoding='utf-8', mode='w', newline='') as f:
 		writer = csv.writer(f)
-		writer.writerow(['id', 'year'] + ALL_GENRES)
+		writer.writerow(['id', 'year', 'genreBits'])
 		for id in movies:
 			item = movies[id]
-			map = [0] * len(ALL_GENRES)
+			map = bitstring.BitArray(length=len(ALL_GENRES))
 			for i in range(len(item.genres)):
 				index = bisect.bisect_left(ALL_GENRES, item.genres[i])
 				map[index] = 1
 
-			writer.writerow([id, item.year] + map)
+			writer.writerow([id, item.year, map.int])
 
 def ensureMovieYearGenresTable(movieYearGenresFileName, dbConnection):
 	cur = dbConnection.cursor()
@@ -77,15 +78,13 @@ def ensureMovieYearGenresTable(movieYearGenresFileName, dbConnection):
 		csvReader = csv.reader(movieYearGenresFile)
 		headers = next(csvReader)
 
-		headers[0] = headers[0] + ' INTEGER NOT NULL PRIMARY KEY'
-		headers = headers[0:1] + [dbHelper.delimiteDBIdentifier(h) + ' INTEGER' for h in headers[1:]]
-		cur.execute("CREATE TABLE {1} ({0})".format(', '.join(headers), TABLE_NAME))
+		cur.execute("CREATE TABLE {0} (id INTEGER NOT NULL PRIMARY KEY, year INTEGER NOT NULL, genreBits INTEGER NOT NULL)".format(TABLE_NAME))
 		# table names can't be the target of parameter substitution
 		# https://stackoverflow.com/a/3247553/746461
 
-		to_db = [row for row in csvReader]
+		to_db = list(csvReader)
 
-		cur.executemany("INSERT INTO {1} VALUES ({0});".format(','.join(['?'] * len(headers)), TABLE_NAME), to_db)
+		cur.executemany("INSERT INTO {0} VALUES (?,?,?)".format(TABLE_NAME), to_db)
 		dbConnection.commit()
 
 	cur.execute('select * from {0} where id=131162'.format(TABLE_NAME))
@@ -151,10 +150,12 @@ def ensureTestRatingTable(fileName, dbConnection):
 
 def trainClassifier(cursor, userId, clf):
 	cursor.execute('''
-SELECT Ratings.rating, MovieYearGenres.year, {0} FROM Ratings
+SELECT Ratings.rating, MovieYearGenres.year, genreBits FROM Ratings
 join MovieYearGenres on Ratings.movieId=MovieYearGenres.id
-where Ratings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentifier(g) for g in ALL_GENRES])), (userId,))
-	trainingData = np.array(cursor.fetchall())
+where Ratings.userId=? ''', (userId,))
+
+	trainingData = [[row[0]] + [row[1]] + list(bitstring.Bits(int=row[2], length=len(ALL_GENRES))) for row in cursor.fetchall()]
+	trainingData = np.array(trainingData, dtype='int32')
 	if len(trainingData) == 0:
 		raise Exception('User {0} does not appear in training set.'.format(userId))
 	y = trainingData[:, 0]
@@ -164,10 +165,11 @@ where Ratings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentifier(g) for
 
 def predictTest(cursor, userId, clf):
 	cursor.execute('''
-SELECT TestRatings.movieId, MovieYearGenres.year, {0} FROM TestRatings
+SELECT TestRatings.movieId, MovieYearGenres.year, genreBits FROM TestRatings
 join MovieYearGenres on TestRatings.movieId=MovieYearGenres.id
-where TestRatings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentifier(g) for g in ALL_GENRES])), (userId,))
-	testingData = np.array(cursor.fetchall())
+where TestRatings.userId=? ''', (userId,))
+	testingData = [[row[0]] + [row[1]] + bitstring.Bits(int=row[2], length=len(ALL_GENRES)) for row in cursor.fetchall()]
+	testingData = np.array(testingData, dtype='int32')
 	predictY = clf.predict(testingData[:, 1:])
 
 	toDB = predictY[:, None]
@@ -183,10 +185,11 @@ def classifyUser(con, userId):
 	clf = tree.DecisionTreeClassifier(random_state=10)
 	clf = trainClassifier(cur, userId, clf)
 	cur.execute('''
-SELECT ValidationRatings.movieId, MovieYearGenres.year, {0} FROM ValidationRatings
+SELECT ValidationRatings.movieId, MovieYearGenres.year, genreBits FROM ValidationRatings
 join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
-where ValidationRatings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentifier(g) for g in ALL_GENRES])), (userId,))
-	validationData = np.array(cur.fetchall())
+where ValidationRatings.userId=? ''', (userId,))
+	validationData = [[row[0]] + [row[1]] + list(bitstring.Bits(int=row[2], length=len(ALL_GENRES))) for row in cur.fetchall()]
+	validationData = np.array(validationData, dtype='int32')
 	predictY = clf.predict(validationData[:, 1:])
 	toDB = predictY[:, None]
 	toDB = np.insert(toDB, 1, userId, axis=1)
