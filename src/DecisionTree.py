@@ -242,9 +242,9 @@ def main():
 
 	cur = con.cursor()
 
-	# cur.execute('update ValidationRatings set predict=null')
-	# cur.execute('update TestRatings set predict=null')
-	# con.commit()
+	cur.execute('update ValidationRatings set predict=null')
+	cur.execute('update TestRatings set predict=null')
+	con.commit()
 
 	cur.execute('''
 SELECT userid FROM ValidationRatings
