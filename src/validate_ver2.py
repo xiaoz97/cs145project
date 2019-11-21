@@ -1,10 +1,13 @@
 import os,sys
 import pandas as pd
 import numpy as np
+
+import datasetHelper
+
 #读入之前获取的sorted rules
 sorted_confidence=np.load("fp1.npy",allow_pickle=True)
 #d读入validation set
-validate_folder="E:/pycharm/cs145project/data"
+validate_folder= datasetHelper.getDataset()
 
 validate_filename = validate_folder+'/val_ratings_binary.csv'
 
