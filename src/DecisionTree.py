@@ -367,7 +367,10 @@ def exportTestRatings(cursor, fileName: str):
 def classifyForUsersInThread(threadId, userIds):
 	assert threadId > 0
 
-	with dbHelper.getConnection(os.path.join(DATA_FOLDER, "sqlite.db")) as con:
+	# On Python 3.7.5 on Windows, DATA_FOLDER does not have the updated value,
+	# so I have to set it again.
+	dataFolder = datasetHelper.getDataset()
+	with dbHelper.getConnection(os.path.join(dataFolder, "sqlite.db")) as con:
 		startTime = time.time()
 		lastP = 0
 		total = len(userIds)
@@ -440,6 +443,7 @@ SELECT userid FROM ValidationRatings
 UNION
 SELECT userId FROM TestRatings''')
 	userIds = [row[0] for row in cur.fetchall()]
+	con.close()
 
 	try:
 		i = sys.argv.index('--first-users')
@@ -471,6 +475,7 @@ SELECT userId FROM TestRatings''')
 		pool.close()
 		pool.join()
 
+	con = dbHelper.getConnection(os.path.join(DATA_FOLDER, "sqlite.db"))
 	dealWithMissingPrediction(cur, 'ValidationRatings')
 	dealWithMissingPrediction(cur, 'TestRatings')
 
