@@ -91,6 +91,27 @@ def ensureMovieYearGenresTable(movieYearGenresFileName, dbConnection):
 	print(cur.fetchone())
 
 
+def ensureGenomeScoresTable(fileName, dbConnection):
+	cur = dbConnection.cursor()
+	TABLE_NAME = 'GenomeScore'
+	if dbHelper.doesTableExist(TABLE_NAME, cur):
+		return
+
+	cur.execute("CREATE TABLE {0} (movieId INTEGER NOT NULL, tagId INTEGER NOT NULL, relevance REAL NOT NULL, PRIMARY KEY(movieId, tagId))".format(TABLE_NAME))
+	with open(os.path.join(DATA_FOLDER, fileName), encoding='utf-8') as f:
+		csvReader = csv.reader(f)
+		next(csvReader)
+
+		to_db = [row for row in csvReader]
+
+		cur.executemany("INSERT INTO {0} VALUES (?,?,?);".format(TABLE_NAME), to_db)
+		dbConnection.commit()
+
+	cur.execute('select * from {0} where movieId=1 and tagId=1'.format(TABLE_NAME))
+	print('GenomeScore table is created.')
+	print(cur.fetchone())
+
+
 def ensureRatingsTable(fileName, dbConnection):
 	cur = dbConnection.cursor()
 	TABLE_NAME = 'Ratings'
@@ -242,6 +263,7 @@ def main():
 	ensureMovieYearGenresFile(DATA_FOLDER, movieYearGenresFileName)
 
 	con = dbHelper.getConnection(os.path.join(DATA_FOLDER, "sqlite.db"))
+	ensureGenomeScoresTable('genome-scores.csv', con)
 	ensureMovieYearGenresTable(movieYearGenresFileName, con)
 	ensureRatingsTable('train_ratings_binary.csv', con)
 	ensureValidationRatingsTable('val_ratings_binary.csv', con)
