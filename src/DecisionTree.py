@@ -4,6 +4,7 @@ import bitstring
 import os
 import csv
 import dbHelper
+import math
 import re
 import sys
 from types import SimpleNamespace
@@ -17,6 +18,56 @@ import zipfile
 
 import datasetHelper
 
+
+def ensureMovieTagsFile(dbConnection, fileName: str, relevanceThreshold: float):
+	global DATA_FOLDER
+	if os.path.isfile(os.path.join(DATA_FOLDER, fileName)):
+		return
+
+	cur = dbConnection.cursor()
+
+	allTagIds = [row[0] for row in cur.execute('select DISTINCT tagId from GenomeScore order by tagId')]
+	tagBitsCount = math.ceil(len(allTagIds) / 32.0)
+
+	tagIdDict = {val: idx for idx, val in enumerate(allTagIds)}
+
+	movies = {}
+	with open(DATA_FOLDER + "/movies.csv", encoding='utf-8') as moviesFile:
+		reader = csv.reader(moviesFile)
+		next(reader)  # skip the column headers
+		for row in reader:
+			id = row[0]
+
+			tagIds = list(row[0] for row in cur.execute('select tagId from GenomeScore where movieId=? and relevance>=?', (id, relevanceThreshold)))
+
+			item = SimpleNamespace()
+			item.tags = [None] * tagBitsCount
+
+			for t in tagIds:
+				# look up the index of the tagId
+				index = tagIdDict[t]
+				binIndex = math.floor(index / 32.0)
+
+				if item.tags[binIndex] is None:
+					item.tags[binIndex] = bitstring.BitArray(length=32)
+
+				item.tags[binIndex].set(1, index % 32)
+
+			movies[id] = item
+
+	with open(os.path.join(DATA_FOLDER, fileName), encoding='utf-8', mode='w', newline='') as f:
+		writer = csv.writer(f)
+		writer.writerow(['id'] + ['tagBits' + str(i) for i in range(tagBitsCount)])
+		for id in movies:
+			item = movies[id]
+			csvRow = [id]
+			for i in range(tagBitsCount):
+				if item.tags[i] is None:
+					csvRow.append(0)
+				else:
+					csvRow.append(item.tags[i].int)
+
+			writer.writerow(csvRow)
 
 def ensureMovieYearGenresFile(dataFolder, movieYearGenresFileName):
 	if os.path.isfile(os.path.join(dataFolder, movieYearGenresFileName)):
