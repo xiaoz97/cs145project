@@ -207,7 +207,11 @@ where ValidationRatings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentif
 
 
 def dealWithMissingPrediction(cursor, table: str):
-	cursor.execute('update {0} set predict=? where predict is null'.format(table), (1,))
+	global FIRST_USERS
+	if FIRST_USERS is None:
+		cursor.execute('update {0} set predict=? where predict is null'.format(table), (1,))
+	else:
+		cursor.execute('update {0} set predict=? where predict is null and userId<=?'.format(table), (1, FIRST_USERS))
 	print('Fixed {0} empty prediction in table {1}.'.format(cursor.rowcount, table))
 
 
@@ -222,7 +226,7 @@ def exportTestRatings(cursor, fileName: str):
 
 
 def main():
-	global MAX_ROWS, ALL_GENRES, DATA_FOLDER
+	global MAX_ROWS, ALL_GENRES, DATA_FOLDER, FIRST_USERS
 	try:
 		i = sys.argv.index('--max-rows')
 		MAX_ROWS = int(sys.argv[i + 1])
@@ -252,6 +256,13 @@ UNION
 SELECT userId FROM TestRatings''')
 	userIds = [row[0] for row in cur.fetchall()]
 
+	try:
+		i = sys.argv.index('--first-users')
+		FIRST_USERS = int(sys.argv[i + 1])
+		userIds = list(filter(lambda x: x <= FIRST_USERS, userIds))
+	except:
+		pass
+
 	startTime = time.time()
 
 	lastP = 0
@@ -277,19 +288,27 @@ SELECT userId FROM TestRatings''')
 	except:
 		pass
 
-	cur.execute('''select t.correct, t.total, CAST(t.correct AS float)/t.total as accuracy
+	if FIRST_USERS is None:
+		cur.execute('''select t.correct, t.total, CAST(t.correct AS float)/t.total as accuracy
 from (Select 
 (select count(*) from ValidationRatings where rating=predict) as correct,
 (select count(*) from ValidationRatings) as total) as t''')
+	else:
+		cur.execute('''select t.correct, t.total, CAST(t.correct AS float)/t.total as accuracy
+from (Select 
+(select count(*) from ValidationRatings where rating=predict and userId<={0}) as correct,
+(select count(*) from ValidationRatings where userId<={0}) as total) as t'''.format(FIRST_USERS))
+
 	row = cur.fetchone()
 	print(row)
 	accuracy = row[2]
 
-	exportTestRatings(cur, 'submit.csv')
+	if FIRST_USERS is None:
+		exportTestRatings(cur, 'submit.csv')
 	con.close()
 
 	print('Best accuracy is {0}. This accuracy is {1}.'.format(bestAccuracy, accuracy))
-	if accuracy > bestAccuracy:
+	if FIRST_USERS is None and accuracy > bestAccuracy:
 		with open(os.path.join(DATA_FOLDER, 'best accuracy.txt'), mode='w') as f:
 			f.write(str(accuracy))
 		if os.system('kaggle competitions submit -c uclacs145fall2019 -m "auto submission with accuracy {1}" -f "{0}"'.format(os.path.join(DATA_FOLDER, 'submit.csv'), accuracy)) != 0:
@@ -299,6 +318,7 @@ from (Select
 DATA_FOLDER = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../data")
 ALL_GENRES = sorted(['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'IMAX', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western'])
 MAX_ROWS = 0
+FIRST_USERS = None
 
 if __name__ == "__main__":
 	main()
