@@ -183,6 +183,8 @@ def ensureGenomeScoresTable(fileName, dbConnection):
 		cur.executemany("INSERT INTO {0} VALUES (?,?,?);".format(TABLE_NAME), to_db)
 		dbConnection.commit()
 
+	cur.execute('CREATE INDEX tagId ON {0} (tagId ASC)'.format(TABLE_NAME))
+
 	cur.execute('select * from {0} where movieId=1 and tagId=1'.format(TABLE_NAME))
 	print('GenomeScore table is created.')
 	print(cur.fetchone())
