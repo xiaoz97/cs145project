@@ -53,7 +53,7 @@ def ensureMovieYearGenresFile(dataFolder, movieYearGenresFileName):
 			item.genres = genres
 			movies[id] = item
 
-	# print(', '.join(allGenres))
+	genresDict = {val: idx for idx, val in enumerate(ALL_GENRES)}
 
 	with open(dataFolder + "/" + movieYearGenresFileName, encoding='utf-8', mode='w', newline='') as f:
 		writer = csv.writer(f)
@@ -62,8 +62,7 @@ def ensureMovieYearGenresFile(dataFolder, movieYearGenresFileName):
 			item = movies[id]
 			map = bitstring.BitArray(length=len(ALL_GENRES))
 			for i in range(len(item.genres)):
-				index = bisect.bisect_left(ALL_GENRES, item.genres[i])
-				map[index] = 1
+				map[genresDict[item.genres[i]]] = 1
 
 			writer.writerow([id, item.year, map.int])
 
