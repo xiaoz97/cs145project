@@ -69,6 +69,32 @@ def ensureMovieTagsFile(dbConnection, fileName: str, relevanceThreshold: float):
 
 			writer.writerow(csvRow)
 
+
+def ensureMovieTagsTable(fileName, dbConnection):
+	cur = dbConnection.cursor()
+	TABLE_NAME = 'MovieTags'
+	if dbHelper.doesTableExist(TABLE_NAME, cur):
+		return
+
+	# Syntax 'create table if not exists' exists, but we don't know if we need to insert rows.
+	with open(os.path.join(DATA_FOLDER, fileName), encoding='utf-8') as movieYearGenresFile:
+		csvReader = csv.reader(movieYearGenresFile)
+		# skip header
+		headers = next(csvReader)
+
+		cur.execute("CREATE TABLE {0} (id INTEGER NOT NULL PRIMARY KEY, {1})".format(TABLE_NAME, ','.join([h+' integer not null' for h in headers[1:]])))
+		# table names can't be the target of parameter substitution
+		# https://stackoverflow.com/a/3247553/746461
+
+		to_db = list(csvReader)
+
+		cur.executemany("INSERT INTO {0} VALUES (?,{1})".format(TABLE_NAME, ','.join(['?']*(len(headers)-1))), to_db)
+		dbConnection.commit()
+
+	cur.execute('select * from {0} where id=2'.format(TABLE_NAME))
+	print(cur.fetchone())
+
+
 def ensureMovieYearGenresFile(dataFolder, movieYearGenresFileName):
 	if os.path.isfile(os.path.join(dataFolder, movieYearGenresFileName)):
 		return
