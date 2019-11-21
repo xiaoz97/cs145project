@@ -180,7 +180,7 @@ where TestRatings.userId=? '''.format(','.join([dbHelper.delimiteDBIdentifier(g)
 def classifyUser(con, userId):
 	cur = con.cursor()
 
-	clf = tree.DecisionTreeClassifier()
+	clf = tree.DecisionTreeClassifier(random_state=10)
 	clf = trainClassifier(cur, userId, clf)
 	cur.execute('''
 SELECT ValidationRatings.movieId, MovieYearGenres.year, {0} FROM ValidationRatings
