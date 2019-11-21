@@ -262,7 +262,7 @@ SELECT userId FROM TestRatings''')
 		p = i * 100 // total
 		if p > lastP:
 			usedTime = time.time() - startTime
-			print('User {0} is done. Progress is {1}%. Used time is {2}s, Remaining time is {3:d}s'.format(i, p, int(usedTime), int(usedTime / p * 100 - usedTime)))
+			print('User {0} is done. Progress is {1}%. Used time is {2}s, Remaining time is {3:d}s'.format(i, p, int(usedTime), int(usedTime / p * 100 - usedTime)), flush=True)
 			lastP = p
 
 	dealWithMissingPrediction(cur, 'ValidationRatings')
