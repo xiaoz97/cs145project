@@ -19,14 +19,13 @@ import zipfile
 import datasetHelper
 
 
-def ensureMovieTagsFile(dbConnection, fileName: str, relevanceThreshold: float):
+def ensureMovieTagsFile(dbConnection, fileName: str, allTagIds, relevanceThreshold: float):
 	global DATA_FOLDER
 	if os.path.isfile(os.path.join(DATA_FOLDER, fileName)):
 		return
 
 	cur = dbConnection.cursor()
 
-	allTagIds = [row[0] for row in cur.execute('select DISTINCT tagId from GenomeScore order by tagId')]
 	tagBitsCount = math.ceil(len(allTagIds) / 32.0)
 
 	tagIdDict = {val: idx for idx, val in enumerate(allTagIds)}
@@ -152,7 +151,8 @@ def ensureMovieYearGenresTable(movieYearGenresFileName, dbConnection):
 	# Syntax 'create table if not exists' exists, but we don't know if we need to insert rows.
 	with open(os.path.join(DATA_FOLDER, movieYearGenresFileName), encoding='utf-8') as movieYearGenresFile:
 		csvReader = csv.reader(movieYearGenresFile)
-		headers = next(csvReader)
+		# skip header
+		next(csvReader)
 
 		cur.execute("CREATE TABLE {0} (id INTEGER NOT NULL PRIMARY KEY, year INTEGER NOT NULL, genreBits INTEGER NOT NULL)".format(TABLE_NAME))
 		# table names can't be the target of parameter substitution
@@ -247,13 +247,25 @@ def ensureTestRatingTable(fileName, dbConnection):
 		dbConnection.commit()
 
 
-def trainClassifier(cursor, userId, clf):
-	cursor.execute('''
-SELECT Ratings.rating, MovieYearGenres.year, genreBits FROM Ratings
-join MovieYearGenres on Ratings.movieId=MovieYearGenres.id
-where Ratings.userId=? ''', (userId,))
+def flatNestList(a):
+	return [item for sublist in a for item in sublist]
 
-	trainingData = [[row[0]] + [row[1]] + list(bitstring.Bits(int=row[2], length=len(ALL_GENRES))) for row in cursor.fetchall()]
+
+def trainClassifier(cursor, userId, clf):
+	global ALL_TAG_IDS
+	tagBitsCount = math.ceil(len(ALL_TAG_IDS) / 32.0)
+
+	cursor.execute('''
+SELECT Ratings.rating, MovieYearGenres.year, genreBits, {0} FROM Ratings
+join MovieYearGenres on Ratings.movieId=MovieYearGenres.id
+join MovieTags on Ratings.movieId=MovieTags.id
+where Ratings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(tagBitsCount)])), (userId,))
+
+	trainingData = [list(row[0:2]) +
+					list(bitstring.Bits(int=row[2], length=len(ALL_GENRES))) +
+					flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[3:]])
+					for row in cursor.fetchall()]
+
 	trainingData = np.array(trainingData, dtype='int32')
 	if len(trainingData) == 0:
 		raise Exception('User {0} does not appear in training set.'.format(userId))
@@ -263,11 +275,20 @@ where Ratings.userId=? ''', (userId,))
 
 
 def predictTest(cursor, userId, clf):
+	global ALL_TAG_IDS
+	tagBitsCount = math.ceil(len(ALL_TAG_IDS) / 32.0)
+
 	cursor.execute('''
-SELECT TestRatings.movieId, MovieYearGenres.year, genreBits FROM TestRatings
+SELECT TestRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM TestRatings
 join MovieYearGenres on TestRatings.movieId=MovieYearGenres.id
-where TestRatings.userId=? ''', (userId,))
-	testingData = [[row[0]] + [row[1]] + bitstring.Bits(int=row[2], length=len(ALL_GENRES)) for row in cursor.fetchall()]
+join MovieTags on TestRatings.movieId=MovieTags.id
+where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(tagBitsCount)])), (userId,))
+
+	testingData = [list(row[0:2]) +
+				   list(bitstring.Bits(int=row[2], length=len(ALL_GENRES))) +
+				   flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[3:]])
+				   for row in cursor.fetchall()]
+
 	testingData = np.array(testingData, dtype='int32')
 	predictY = clf.predict(testingData[:, 1:])
 
@@ -279,15 +300,23 @@ where TestRatings.userId=? ''', (userId,))
 
 
 def classifyUser(con, userId):
+	global ALL_TAG_IDS
+	tagBitsCount = math.ceil(len(ALL_TAG_IDS) / 32.0)
+
 	cur = con.cursor()
 
 	clf = tree.DecisionTreeClassifier(random_state=10)
 	clf = trainClassifier(cur, userId, clf)
 	cur.execute('''
-SELECT ValidationRatings.movieId, MovieYearGenres.year, genreBits FROM ValidationRatings
+SELECT ValidationRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM ValidationRatings
 join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
-where ValidationRatings.userId=? ''', (userId,))
-	validationData = [[row[0]] + [row[1]] + list(bitstring.Bits(int=row[2], length=len(ALL_GENRES))) for row in cur.fetchall()]
+join MovieTags on ValidationRatings.movieId=MovieTags.id
+where ValidationRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(tagBitsCount)])), (userId,))
+	validationData = [list(row[0:2]) +
+					  list(bitstring.Bits(int=row[2], length=len(ALL_GENRES))) +
+					  flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[3:]])
+					  for row in cur.fetchall()]
+
 	validationData = np.array(validationData, dtype='int32')
 	predictY = clf.predict(validationData[:, 1:])
 	toDB = predictY[:, None]
@@ -328,7 +357,7 @@ def exportTestRatings(cursor, fileName: str):
 
 
 def main():
-	global MAX_ROWS, ALL_GENRES, DATA_FOLDER, FIRST_USERS
+	global MAX_ROWS, ALL_GENRES, DATA_FOLDER, ALL_TAG_IDS, FIRST_USERS
 	try:
 		i = sys.argv.index('--max-rows')
 		MAX_ROWS = int(sys.argv[i + 1])
@@ -343,11 +372,15 @@ def main():
 	con = dbHelper.getConnection(os.path.join(DATA_FOLDER, "sqlite.db"))
 	ensureGenomeScoresTable('genome-scores.csv', con)
 	ensureMovieYearGenresTable(movieYearGenresFileName, con)
+
+	cur = con.cursor()
+	ALL_TAG_IDS = [row[0] for row in cur.execute('select DISTINCT tagId from GenomeScore order by tagId')]
+	ensureMovieTagsFile(con, 'movie-tags.csv', ALL_TAG_IDS, 0.5)
+	ensureMovieTagsTable('movie-tags.csv', con)
+
 	ensureRatingsTable('train_ratings_binary.csv', con)
 	ensureValidationRatingsTable('val_ratings_binary.csv', con)
 	ensureTestRatingTable('test_ratings.csv', con)
-
-	cur = con.cursor()
 
 	cur.execute('update ValidationRatings set predict=null')
 	cur.execute('update TestRatings set predict=null')
