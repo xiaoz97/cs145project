@@ -8,7 +8,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score
 
 import datasetHelper
-import DecisionTree
+import Program
 import generate_movieRatings
 
 
@@ -49,7 +49,7 @@ def predictValidation(model):
 
 dataFolder = datasetHelper.getDataset()
 
-DecisionTree.ensureMovieYearGenresFile(dataFolder, 'movies-year-genres.csv')
+Program.ensureMovieYearGenresFile(dataFolder, 'movies-year-genres.csv')
 
 generate_movieRatings.ensureMergedCsv(dataFolder)
 
