@@ -21,10 +21,13 @@ import datasetHelper
 
 def ensureMovieTagsFile(dbConnection, fileName: str, allTagIds, relevanceThreshold: float):
 	global DATA_FOLDER
-	if os.path.isfile(os.path.join(DATA_FOLDER, fileName)):
-		return
 
 	cur = dbConnection.cursor()
+
+	cur.execute('drop table if exists MovieTags')
+	dbConnection.commit()
+	if os.path.isfile(os.path.join(DATA_FOLDER, fileName)):
+		return
 
 	tagBitsCount = math.ceil(len(allTagIds) / 32.0)
 
@@ -375,8 +378,16 @@ def main():
 
 	cur = con.cursor()
 	ALL_TAG_IDS = [row[0] for row in cur.execute('select DISTINCT tagId from GenomeScore order by tagId')]
-	ensureMovieTagsFile(con, 'movie-tags.csv', ALL_TAG_IDS, 0.5)
-	ensureMovieTagsTable('movie-tags.csv', con)
+
+	try:
+		i = sys.argv.index('--relevance')
+		relevance = float(sys.argv[i + 1])
+	except:
+		relevance = 0.5
+
+	movieTagsFileName = '{0:.2f}-'.format(relevance) + 'movie-tags.csv'
+	ensureMovieTagsFile(con, movieTagsFileName, ALL_TAG_IDS, relevance)
+	ensureMovieTagsTable(movieTagsFileName, con)
 
 	ensureRatingsTable('train_ratings_binary.csv', con)
 	ensureValidationRatingsTable('val_ratings_binary.csv', con)
