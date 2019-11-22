@@ -36,6 +36,7 @@ def getFrequentPatterns():
 	assert len(dataset[0]) == encodedDataset.iloc[0].sum()
 
 	frequentPatterns = mlxtend.frequent_patterns.apriori(encodedDataset, min_support=0.1)
+	frequentPatterns = frequentPatterns[[len(s) > 1 for s in frequentPatterns['itemsets']]]
 	np.save(os.path.join(data_folder, "fp1.npy"), frequentPatterns)
 	return frequentPatterns
 
@@ -50,13 +51,13 @@ validate_folder = datasetHelper.getDataset()
 
 validate_filename = validate_folder + '/val_ratings_binary.csv'
 
-validate = pd.read_csv(validate_filename)
+validate = pd.read_csv(validate_filename, dtype='int32')
 # print(validate)
 # 读入原文件并存储进入favorable_reviews_by_users
 # original_filename = validate_folder+"/train_ratings_binary.csv"
 original_filename = validate_folder + "/train_ratings_binary.csv"
 
-original = pd.read_csv(original_filename)
+original = pd.read_csv(original_filename, dtype='int32')
 
 favorable_reviews_by_users = dict((k, frozenset(v.values)) for k, v in original.groupby("userId")["movieId"])
 
@@ -67,7 +68,7 @@ print("start")
 
 for index, row in validate.iterrows():
 	# cnt标记prediction total为总数
-	cnt = 0
+	predict = 0
 	user_likes = favorable_reviews_by_users[row["userId"]]
 	up = 0
 	down = 0
@@ -76,24 +77,25 @@ for index, row in validate.iterrows():
 	for confidence, rules in sorted_confidence:
 		# 遍历已获取的规则，如果conclusion与当前需判断的电影相同，则判断premise是否在用户已经看过的电影中
 
-		if row["movieId"] in (rules) and len(rules) > 1:
-
+		# 电影A属于电影集合{A,B,C,D}。一个用户看了{B,C,D}，那他也会喜欢A。
+		if row["movieId"] in (rules):
+			# Does the user like other movies?
 			a = list(rules)
 			a.remove(row["movieId"])
 			# print(a)
 			if set(a) < set(user_likes):
-				cnt = 1
-				if (cnt == row["rating"]):
+				predict = 1
+				if (predict == row["rating"]):
 					print("right")
-				if (cnt != row["rating"]):
+				if (predict != row["rating"]):
 					print("wrong")
 				break
 
 	# 如果不符合任何conclusion以及premise，暂时产生0，1随机数
-	if (cnt == 0):
-		cnt = np.random.randint(0, 1)
+	if (predict == 0):
+		predict = 1
 	# 与真实rating比对
-	if cnt == row["rating"]:
+	if predict == row["rating"]:
 		correct += 1
 		# 每出现100个正确的输出此时准确率
 		if (correct % 1000 == 0):
