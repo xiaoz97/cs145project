@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for (( i =0.1; i<=0.7;i+=0.05))
+for  i in $(seq 0.1 0.05 0.7)
 do
-	./Program --parallel auto --relevance ${i}
+	./Program.py --parallel auto --relevance ${i}
 done
