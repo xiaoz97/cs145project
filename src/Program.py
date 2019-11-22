@@ -24,8 +24,8 @@ def ensureMovieTagsFile(dbConnection, fileName: str, allTagIds, relevanceThresho
 
 	cur = dbConnection.cursor()
 
-	# cur.execute('drop table if exists MovieTags')
-	# dbConnection.commit()
+	cur.execute('drop table if exists MovieTags')
+	dbConnection.commit()
 	if os.path.isfile(os.path.join(DATA_FOLDER, fileName)):
 		return
 
