@@ -415,7 +415,7 @@ from (Select
 	con.close()
 
 	print('Best accuracy is {0}. This accuracy is {1}.'.format(bestAccuracy, accuracy))
-	if FIRST_USERS is None and accuracy > bestAccuracy:
+	if FIRST_USERS is None and (bestAccuracy == 1 or accuracy > bestAccuracy):
 		with open(os.path.join(DATA_FOLDER, 'best accuracy.txt'), mode='w') as f:
 			f.write(str(accuracy))
 		if os.system('kaggle competitions submit -c uclacs145fall2019 -m "auto submission with accuracy {1}" -f "{0}"'.format(os.path.join(DATA_FOLDER, 'submit.csv'), accuracy)) != 0:
