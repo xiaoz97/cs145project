@@ -16,16 +16,16 @@ class Classifier(object):
 		self.ALL_TAG_IDS = ALL_TAG_IDS
 		self.userIds=userIds
 
+		self.tagBitsCount = math.ceil(len(self.ALL_TAG_IDS) / 32.0)
+
 
 
 	def trainClassifier(self, cursor, userId, clf):
-		tagBitsCount = math.ceil(len(self.ALL_TAG_IDS) / 32.0)
-
 		cursor.execute('''
 	SELECT Ratings.rating, MovieYearGenres.year, genreBits, {0} FROM Ratings
 	join MovieYearGenres on Ratings.movieId=MovieYearGenres.id
 	join MovieTags on Ratings.movieId=MovieTags.id
-	where Ratings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(tagBitsCount)])), (userId,))
+	where Ratings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(self.tagBitsCount)])), (userId,))
 
 		trainingData = [list(row[0:2]) +
 						list(bitstring.Bits(int=row[2], length=len(self.ALL_GENRES))) +
@@ -41,13 +41,11 @@ class Classifier(object):
 
 
 	def predictTest(self,cursor, userId, clf):
-		tagBitsCount = math.ceil(len(self.ALL_TAG_IDS) / 32.0)
-
 		cursor.execute('''
 	SELECT TestRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM TestRatings
 	join MovieYearGenres on TestRatings.movieId=MovieYearGenres.id
 	join MovieTags on TestRatings.movieId=MovieTags.id
-	where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(tagBitsCount)])), (userId,))
+	where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(self.tagBitsCount)])), (userId,))
 
 		testingData = [list(row[0:2]) +
 					   list(bitstring.Bits(int=row[2], length=len(self.ALL_GENRES))) +
@@ -65,8 +63,6 @@ class Classifier(object):
 
 
 	def classifyForUser(self, con, userId):
-		tagBitsCount = math.ceil(len(self.ALL_TAG_IDS) / 32.0)
-
 		cur = con.cursor()
 
 		clf = tree.DecisionTreeClassifier(random_state=10)
@@ -75,7 +71,7 @@ class Classifier(object):
 	SELECT ValidationRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM ValidationRatings
 	join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
 	join MovieTags on ValidationRatings.movieId=MovieTags.id
-	where ValidationRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(tagBitsCount)])), (userId,))
+	where ValidationRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(self.tagBitsCount)])), (userId,))
 		validationData = [list(row[0:2]) +
 						  list(bitstring.Bits(int=row[2], length=len(self.ALL_GENRES))) +
 						  flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[3:]])
