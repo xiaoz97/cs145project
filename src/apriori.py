@@ -42,61 +42,125 @@ def getFrequentPatterns():
 
 
 frequentPatterns = getFrequentPatterns()
-print(frequentPatterns)
+frequentPatterns['length'] = frequentPatterns['itemsets'].apply(lambda x: len(x))
+# 筛选出长度大于1的frequent pattern
+freq=frequentPatterns[frequentPatterns['length']>=2]
+print(freq)
 
+np.save("freq.npy",freq)
+freq = np.load("freq.npy")
+
+freq = np.load("freq.npy")
+candidate_rules = []
+# 统计每个用户各喜欢哪些电影，按照UserID进行分组，并遍历每个用户看过的每一部电影
+favorable_reviews_by_users = dict((k, frozenset(v.values)) for k,v in favorable_ratings.groupby("userId")["movieId"])
+# 创建一个数据框，以便了解每部电影的影迷数量
+# 导入字典
+from collections import defaultdict
+# 定义一个发现新的频繁项集的函数，参数为（每个用户喜欢哪些电影字典，上一个频繁项集，最小支持度）
+
+for rules in freq:
+    print(rules)
+    for conclusion in rules[1]:
+        # 项集中的其他电影作为前提
+        temp=list(rules[1])
+
+        temp.remove(conclusion)
+
+        temp=tuple(temp)
+        # 用前提和结论组成备选规则
+        candidate_rules.append((temp, conclusion))
+
+# print(candidate_rules[:5])
+
+print(candidate_rules)
+# 创建两个字典, 用来存储规则正例，和返例的次数
+correct_counts = defaultdict(int)
+incorrect_counts = defaultdict(int)
+# 遍历每个用户喜欢的电影数据
+for user, reviews in favorable_reviews_by_users.items():
+    # 遍历每条关联规则
+    for candidate_rule in candidate_rules:
+        candidate_rule=tuple(candidate_rule)
+
+        premise,conclusion = candidate_rule
+        # 判断用户是否喜欢前提中的电影
+        if set(premise).issubset(reviews):
+            # 如果前提符合，看一下用户是否喜欢结论中的电影
+            if conclusion in reviews:
+                correct_counts[candidate_rule] += 1
+            else:
+                incorrect_counts[candidate_rule] += 1
+
+min_confidence = 0.6
+rule_confidence=[]
+print("yes")
+# 用正例次数除以前提条件出现的总次数，计算每条规则的置信度
+for candidate_rule in candidate_rules:
+    print(correct_counts[tuple(candidate_rule)])
+    print(incorrect_counts[tuple(candidate_rule)])
+    if(correct_counts[tuple(candidate_rule)]+incorrect_counts[tuple(candidate_rule)]!=0):
+        confidence = correct_counts[tuple(candidate_rule)] / (
+            float(correct_counts[tuple(candidate_rule)] + incorrect_counts[tuple(candidate_rule)]))
+        print(confidence)
+        if confidence > min_confidence:
+            rule_confidence.append((confidence, candidate_rule))
+# 最小支持置信度
+# 筛选出执行度大于0.9的
+#print(len(rule_confidence))
+print(rule_confidence)
+
+np.save('sorted_confidence.npy', rule_confidence)
 # 读入之前获取的sorted rules
-sorted_confidence = np.load("fp1.npy", allow_pickle=True)
-# d读入validation set
-validate_folder = datasetHelper.getDataset()
+sorted_confidence=np.load("sorted_confidence.npy")
 
-validate_filename = validate_folder + '/val_ratings_binary.csv'
+#d读入validation set
+validate_folder="E:/pycharm/cs145project/data"
 
-validate = pd.read_csv(validate_filename, dtype='int32')
-# print(validate)
-# 读入原文件并存储进入favorable_reviews_by_users
-# original_filename = validate_folder+"/train_ratings_binary.csv"
-original_filename = validate_folder + "/train_ratings_binary.csv"
+validate_filename = validate_folder+'/val_ratings_binary.csv'
 
-original = pd.read_csv(original_filename, dtype='int32')
+validate = pd.read_csv(validate_filename)
+#print(validate)
+#读入原文件并存储进入favorable_reviews_by_users
+#original_filename = validate_folder+"/train_ratings_binary.csv"
+original_filename = validate_folder+"/train_ratings_binary.csv"
 
-favorable_reviews_by_users = dict((k, frozenset(v.values)) for k, v in original.groupby("userId")["movieId"])
+original = pd.read_csv(original_filename)
 
-correct = 0
-total = 0
+favorable_reviews_by_users = dict((k, frozenset(v.values)) for k,v in original.groupby("userId")["movieId"])
 
+correct=0
+total=0
 print("start")
 
 for index, row in validate.iterrows():
-	# cnt标记prediction total为总数
-	predict = 0
-	user_likes = favorable_reviews_by_users[row["userId"]]
-	up = 0
-	down = 0
+    #cnt标记prediction total为总数
+    cnt=0
 
-	total += 1
-	for confidence, rules in sorted_confidence:
-		# 遍历已获取的规则，如果conclusion与当前需判断的电影相同，则判断premise是否在用户已经看过的电影中
+    total+=1
+    for confidence, rules in sorted_confidence:
+        #遍历已获取的规则，如果conclusion与当前需判断的电影相同，则判断premise是否在用户已经看过的电影中
 
-		# 电影A属于电影集合{A,B,C,D}。一个用户看了{B,C,D}，那他也会喜欢A。
-		if row["movieId"] in (rules):
-			# Does the user like other movies?
-			a = list(rules)
-			a.remove(row["movieId"])
-			# print(a)
-			if set(a) < set(user_likes):
-				predict = 1
-				if (predict == row["rating"]):
-					print("right")
-				if (predict != row["rating"]):
-					print("wrong")
-				break
+        if rules[1]==row["movieId"]:
+            #print("same")
+            #print(rules[0])
+            #print(favorable_reviews_by_users[row["userId"]])
+            # a=float((len(list(rules[0])+list(favorable_reviews_by_users[row["userId"]]))-len(list(set(list(rules[0])+list(favorable_reviews_by_users[row["userId"]])))))/len(rules[0]))
+            # print("a:"+str(a))
 
-	# 如果不符合任何conclusion以及premise，暂时产生0，1随机数
-	if (predict == 0):
-		predict = 1
-	# 与真实rating比对
-	if predict == row["rating"]:
-		correct += 1
-		# 每出现100个正确的输出此时准确率
-		if (correct % 1000 == 0):
-			print(correct / total)
+            if (len(list(rules[0]) + list(favorable_reviews_by_users[row["userId"]])) - len(list(set(list(rules[0]) + list(favorable_reviews_by_users[row["userId"]])))))/(len(rules[0]))>=0.5:
+                cnt=1
+                if cnt==row["rating"]:
+                    print("yes")
+                else:
+                    print("no")
+                break
+    #如果不符合任何conclusion以及premise，暂时产生0，1随机数
+    if(cnt==0):
+        cnt=np.random.randint(0, 1)
+    #与真实rating比对
+    if cnt==row["rating"]:
+        correct+=1
+        #每出现100个正确的输出此时准确率
+        if(correct%1000==0):
+            print(correct/total)
