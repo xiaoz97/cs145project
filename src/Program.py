@@ -294,7 +294,7 @@ def classifyForUsersInThread(threadId, classifier):
 			if p > lastP:
 				usedTime = time.time() - startTime
 				print('[Thread {4}] User {0} is done. Progress is {1}%. Used time is {2}s, Remaining time is {3:d}s.'.
-					  format(classifier.userIds[i], p, int(usedTime), int(usedTime / p * 100 - usedTime), threadId))
+					  format(classifier.userIds[i], p, int(usedTime), int(usedTime / p * 101 - usedTime), threadId))
 				lastP = p
 
 
