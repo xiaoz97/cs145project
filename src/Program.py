@@ -369,6 +369,7 @@ SELECT userId FROM TestRatings''')
 	except:
 		parallel = 1
 
+	print('Classification starts with {0} processes.'.format(parallel))
 	if parallel == 1:
 		classifyForUsersInThread(1, Classifier(ALL_GENRES, ALL_TAG_IDS, userIds))
 	else:
