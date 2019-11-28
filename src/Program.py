@@ -16,7 +16,8 @@ from multiprocessing import cpu_count
 from types import SimpleNamespace
 
 import datasetHelper
-import DecisionTree
+
+from Perceptron import Classifier
 
 
 def ensureMovieTagsFile(dbConnection, fileName: str, allTagIds, relevanceThreshold: float):
@@ -370,13 +371,13 @@ SELECT userId FROM TestRatings''')
 		parallel = 1
 
 	if parallel == 1:
-		classifyForUsersInThread(1, DecisionTree.Classifier(ALL_GENRES, ALL_TAG_IDS, userIds))
+		classifyForUsersInThread(1, Classifier(ALL_GENRES, ALL_TAG_IDS, userIds))
 	else:
 		chunkedUserIds = list(chunkify(userIds, cpu_count()))
 		pool = Pool(len(chunkedUserIds))
 
 		for i in range(len(chunkedUserIds)):
-			pool.apply_async(classifyForUsersInThread, args=(i + 1, DecisionTree.Classifier(ALL_GENRES, ALL_TAG_IDS, chunkedUserIds[i])))
+			pool.apply_async(classifyForUsersInThread, args=(i + 1, Classifier(ALL_GENRES, ALL_TAG_IDS, chunkedUserIds[i])))
 
 		pool.close()
 		pool.join()
