@@ -100,9 +100,9 @@ where ValidationRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in
 				if score > bestScore:
 					bestScore = score
 					bestClf = clf
-		except:
-			print(format_exc(), file=sys.stderr)
-			print('Not use StratifiedKFold for this user.', file=sys.stderr)
+		except Exception as ex:
+			# print(format_exc(), file=sys.stderr)
+			print(str(ex)+' Not use StratifiedKFold for user {0}.'.format(userId))
 
 			bestClf = tree.DecisionTreeClassifier(random_state=10)
 			y_train, X_train = np.split(trainingData, [1], axis=1)
