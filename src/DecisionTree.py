@@ -1,8 +1,12 @@
 import bitstring
 import math
 import numpy as np
+import sys
 
 from sklearn import tree
+from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import StratifiedKFold, train_test_split
+from traceback import format_exc
 
 from Program import flatNestList
 
@@ -12,12 +16,11 @@ class Classifier(object):
 	def __init__(self, ALL_GENRES, ALL_TAG_IDS, userIds):
 		self.ALL_GENRES = ALL_GENRES
 		self.ALL_TAG_IDS = ALL_TAG_IDS
-		self.userIds=userIds
+		self.userIds = userIds
 		self.tagBitsCount = math.ceil(len(self.ALL_TAG_IDS) / 32.0)
 
 
-
-	def trainClassifier(self, cursor, userId, clf):
+	def runKFold(self, cursor, userId):
 		cursor.execute('''
 	SELECT Ratings.rating, MovieYearGenres.year, genreBits, {0} FROM Ratings
 	join MovieYearGenres on Ratings.movieId=MovieYearGenres.id
@@ -32,12 +35,43 @@ class Classifier(object):
 		trainingData = np.array(trainingData, dtype='int32')
 		if len(trainingData) == 0:
 			raise Exception('User {0} does not appear in training set.'.format(userId))
+
+		# StratifiedKFold用法类似Kfold，但是他确保训练集，测试集中各类别样本的比例与原始数据集中相同。
+		# 就不会训练集中很多喜欢，导致测试集很多不喜欢。
+
 		y = trainingData[:, 0]
 		X = trainingData[:, 1:]
-		return clf.fit(X, y)
+			
+		# Make sure each fold has at least 5 samples, and we want at most 5 folds.
+		n_splits = min(len(X) // 5, 5)
+		bestClf = None
+		bestScore = 0
+		try:
+			for train_index, test_index in StratifiedKFold(n_splits, random_state=1206).split(X, y):
+				X_train, X_test = X[train_index], X[test_index]
+				y_train, y_test = y[train_index], y[test_index]
 
+				clf = tree.DecisionTreeClassifier(random_state=10)
+				clf.fit(X_train, y_train)
 
-	def predictTest(self, cursor, userId, clf):
+				predictY = clf.predict(X_test)
+
+				# Ideally we should use roc_auc_score, but there are cases where
+				# only one class present in y_true. ROC AUC score is not defined in that case.
+				score = roc_auc_score(y_test, predictY)
+				if score > bestScore:
+					bestScore = score
+					bestClf = clf
+		except Exception as ex:
+			# print(format_exc(), file=sys.stderr)
+			print(str(ex) + ' Not use StratifiedKFold for user {0}.'.format(userId))
+
+			bestClf = tree.DecisionTreeClassifier(random_state=10)
+			bestClf.fit(X, y)
+		return bestClf
+		
+		
+	def __predictTest(self, cursor, userId, clf):
 		cursor.execute('''
 SELECT TestRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM TestRatings
 join MovieYearGenres on TestRatings.movieId=MovieYearGenres.id
@@ -62,8 +96,8 @@ where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range
 	def classifyForUser(self, con, userId):
 		cur = con.cursor()
 
-		clf = tree.DecisionTreeClassifier(random_state=10)
-		clf = self.trainClassifier(cur, userId, clf)
+		clf = self.runKFold(cur, userId)
+
 		cur.execute('''
 SELECT ValidationRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM ValidationRatings
 join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
@@ -85,5 +119,6 @@ where ValidationRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in
 		# tree.plot_tree(clf)
 		# plt.show()
 		con.commit()
-		self.predictTest(cur, userId, clf)
+		self.__predictTest(cur, userId, clf)
 		con.commit()
+
