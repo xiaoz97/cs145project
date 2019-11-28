@@ -374,7 +374,9 @@ SELECT userId FROM TestRatings''')
 		model = __import__(m, fromlist=['Classifier'])
 	except:
 		model = __import__('DecisionTree', fromlist=['Classifier'])
-
+		
+	print('Classification using {0} starts with {1} processes.'.format(model, parallel))
+	
 	if parallel == 1:
 		classifyForUsersInThread(1, model.Classifier(ALL_GENRES, ALL_TAG_IDS, userIds))
 	else:
