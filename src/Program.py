@@ -330,7 +330,7 @@ def main():
 		i = sys.argv.index('--relevance')
 		relevance = float(sys.argv[i + 1])
 	except:
-		relevance = 0.5
+		relevance = 0.46
 
 	movieTagsFileName = '{0:.2f}-'.format(relevance) + 'movie-tags.csv'
 	ensureMovieTagsFile(con, movieTagsFileName, ALL_TAG_IDS, relevance)
