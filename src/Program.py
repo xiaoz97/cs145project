@@ -3,7 +3,6 @@
 import bitstring
 import os
 import csv
-import dbHelper
 import math
 import re
 import sqlite3
@@ -16,6 +15,7 @@ from multiprocessing import cpu_count
 from types import SimpleNamespace
 
 import datasetHelper
+import dbHelper
 import DecisionTree
 
 
