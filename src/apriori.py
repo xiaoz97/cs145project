@@ -17,8 +17,11 @@ def getFrequentPatterns(data_folder):
 
 	# 文件地址
 	ratings_filename = data_folder + '/train_ratings_binary.csv'
+
+	startTime = time.time()
 	# 给u.data 加标题行
 	all_ratings = pd.read_csv(ratings_filename)
+	print('Loading data takes {0} seconds.'.format(time.time() - startTime))
 
 	# 新建一个数据集，只包括用户喜欢某部电影的数据行
 	favorable_ratings = all_ratings[all_ratings["rating"] == 1]
