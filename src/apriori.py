@@ -36,6 +36,8 @@ def getFrequentPatterns():
 
 	assert len(dataset[0]) == encodedDataset.iloc[0].sum()
 
+	print("dataset shape is " + str(encodedDataset.shape))
+	print("Run apriori with min_support=0.05")
 	frequentPatterns = mlxtend.frequent_patterns.apriori(encodedDataset, min_support=0.05)
 	frequentPatterns['length'] = frequentPatterns['itemsets'].apply(lambda x: len(x))
 	freq = frequentPatterns[frequentPatterns['length'] >= 2]
