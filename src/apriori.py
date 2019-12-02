@@ -11,8 +11,9 @@ import datasetHelper
 def getFrequentPatterns():
 	# 文件夹地址
 	data_folder = datasetHelper.getDataset()
-	if os.path.isfile(os.path.join(data_folder, "fp1.npy")):
-		frequentPatterns = np.load("fp1.npy", allow_pickle=True)
+	if os.path.isfile(os.path.join(data_folder, "freq.npy")):
+		frequentPatterns = np.load(os.path.join(data_folder, "freq.npy"), allow_pickle=True)
+		print("load")
 		return frequentPatterns
 
 	# 文件地址
@@ -35,68 +36,115 @@ def getFrequentPatterns():
 
 	assert len(dataset[0]) == encodedDataset.iloc[0].sum()
 
-	frequentPatterns = mlxtend.frequent_patterns.apriori(encodedDataset, min_support=0.1)
-	frequentPatterns = frequentPatterns[[len(s) > 1 for s in frequentPatterns['itemsets']]]
-	np.save(os.path.join(data_folder, "fp1.npy"), frequentPatterns)
-	return frequentPatterns
+	frequentPatterns = mlxtend.frequent_patterns.apriori(encodedDataset, min_support=0.05)
+	frequentPatterns['length'] = frequentPatterns['itemsets'].apply(lambda x: len(x))
+	freq = frequentPatterns[frequentPatterns['length'] >= 2]
+	np.save(os.path.join(data_folder, "freq.npy"), freq)
+	return freq
 
 
-frequentPatterns = getFrequentPatterns()
-print(frequentPatterns)
+data_folder = datasetHelper.getDataset()
+freq = getFrequentPatterns()
+# print(freq)
+ratings_filename = data_folder + '/train_ratings_binary.csv'
+# Get favorite movies for each user
+all_ratings = pd.read_csv(ratings_filename)
 
-# 读入之前获取的sorted rules
-sorted_confidence = np.load("fp1.npy", allow_pickle=True)
-# d读入validation set
-validate_folder = datasetHelper.getDataset()
+favorable_ratings = all_ratings[all_ratings["rating"] == 1]
 
-validate_filename = validate_folder + '/val_ratings_binary.csv'
+candidate_rules = []
 
-validate = pd.read_csv(validate_filename, dtype='int32')
-# print(validate)
-# 读入原文件并存储进入favorable_reviews_by_users
-# original_filename = validate_folder+"/train_ratings_binary.csv"
-original_filename = validate_folder + "/train_ratings_binary.csv"
+favorable_reviews_by_users = dict(
+	(k, frozenset(v.values)) for k, v in favorable_ratings.groupby("userId")["movieId"])
 
-original = pd.read_csv(original_filename, dtype='int32')
+# load sorted_confidence; If file doesn't exist, then generate a new one.
+if os.path.isfile(os.path.join(data_folder, "sorted_confidence.npy")):
+	sorted_confidence = np.load(os.path.join(data_folder, "sorted_confidence.npy"), allow_pickle=True)
+	print("load sort")
+	print(sorted_confidence)
+else:
+	from collections import defaultdict
 
-favorable_reviews_by_users = dict((k, frozenset(v.values)) for k, v in original.groupby("userId")["movieId"])
+	# generate potential rule candidates
+	for rules in freq:
+		for conclusion in rules[1]:
+			# 项集中的其他电影作为前提
+			temp = list(rules[1])
+			temp.remove(conclusion)
+			temp = tuple(temp)
+			# 用前提和结论组成备选规则
+			candidate_rules.append((temp, conclusion))
 
+	correct_counts = defaultdict(int)
+	incorrect_counts = defaultdict(int)
+	# Traverse the whole dataset
+	for user, reviews in favorable_reviews_by_users.items():
+		# 遍历每条关联规则
+		for candidate_rule in candidate_rules:
+			candidate_rule = tuple(candidate_rule)
+			# print(candidate_rule)
+			premise, conclusion = candidate_rule
+			# 判断用户是否喜欢前提中的电影
+			if set(premise).issubset(reviews):
+				# 如果前提符合，看一下用户是否喜欢结论中的电影
+				if conclusion in reviews:
+					correct_counts[candidate_rule] += 1
+				else:
+					incorrect_counts[candidate_rule] += 1
+	# Decide minimum confidence; Here we set as 0.4
+
+	min_confidence = 0.4
+	rule_confidence = []
+	print("start measuring")
+
+	# Calculate the confidence of each rule candidates
+	for candidate_rule in candidate_rules:
+		if (correct_counts[tuple(candidate_rule)] + incorrect_counts[tuple(candidate_rule)] != 0):
+			confidence = correct_counts[tuple(candidate_rule)] / (
+				float(correct_counts[tuple(candidate_rule)] + incorrect_counts[tuple(candidate_rule)]))
+			print(confidence)
+
+			if confidence > min_confidence:
+				rule_confidence.append((confidence, candidate_rule))
+				print(confidence, candidate_rule, )
+
+	print(rule_confidence)
+	np.save(os.path.join(data_folder, "sorted_confidence.npy"), rule_confidence)
+	sorted_confidence = np.load(os.path.join(data_folder, "sorted_confidence.npy"), allow_pickle=True)
+
+# Validation Part
+# 读入validation set
+
+validate_filename = data_folder + '/val_ratings_binary.csv'
+
+validate = pd.read_csv(validate_filename)
 correct = 0
 total = 0
-
 print("start")
+print(sorted_confidence)
 
 for index, row in validate.iterrows():
 	# cnt标记prediction total为总数
-	predict = 0
-	user_likes = favorable_reviews_by_users[row["userId"]]
-	up = 0
-	down = 0
-
+	cnt = 0
 	total += 1
 	for confidence, rules in sorted_confidence:
-		# 遍历已获取的规则，如果conclusion与当前需判断的电影相同，则判断premise是否在用户已经看过的电影中
 
-		# 电影A属于电影集合{A,B,C,D}。一个用户看了{B,C,D}，那他也会喜欢A。
-		if row["movieId"] in (rules):
-			# Does the user like other movies?
-			a = list(rules)
-			a.remove(row["movieId"])
-			# print(a)
-			if set(a) < set(user_likes):
-				predict = 1
-				if (predict == row["rating"]):
-					print("right")
-				if (predict != row["rating"]):
-					print("wrong")
+		if rules[1] == row["movieId"]:
+			if (len(list(rules[0]) + list(favorable_reviews_by_users[row["userId"]])) - len(
+					list(set(list(rules[0]) + list(favorable_reviews_by_users[row["userId"]]))))) / (
+					len(rules[0])) >= 0.5:
+				cnt = 1
+				if cnt == row["rating"]:
+					print("yes")
+				else:
+					print("no")
 				break
-
-	# 如果不符合任何conclusion以及premise，暂时产生0，1随机数
-	if (predict == 0):
-		predict = 1
-	# 与真实rating比对
-	if predict == row["rating"]:
+	# If the new movie is not in our rules, then randomly generate 0 or 1;
+	if (cnt == 0):
+		cnt = np.random.randint(0, 1)
+	# Compare with real rating
+	if cnt == row["rating"]:
 		correct += 1
-		# 每出现100个正确的输出此时准确率
+		# print accuracy
 		if (correct % 1000 == 0):
 			print(correct / total)
