@@ -8,9 +8,8 @@ from mlxtend.preprocessing import TransactionEncoder
 import datasetHelper
 
 
-def getFrequentPatterns():
+def getFrequentPatterns(data_folder):
 	# 文件夹地址
-	data_folder = datasetHelper.getDataset()
 	if os.path.isfile(os.path.join(data_folder, "freq.npy")):
 		frequentPatterns = np.load(os.path.join(data_folder, "freq.npy"), allow_pickle=True)
 		print("load")
@@ -46,7 +45,7 @@ def getFrequentPatterns():
 
 
 data_folder = datasetHelper.getDataset()
-freq = getFrequentPatterns()
+freq = getFrequentPatterns(data_folder)
 # print(freq)
 ratings_filename = data_folder + '/train_ratings_binary.csv'
 # Get favorite movies for each user
