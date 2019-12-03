@@ -13,6 +13,10 @@ highest:0.53
 
 `./DecisionTree.py`
 
+`--model x`:
+
+Choose a model to run. `x` should be a file name inside the src folder. By default the program uses `DecisionTree`.
+
 `--parallel x`:
 
 If the option is not specified, the program uses 1 thread/process. If x is an integer, the program uses x threads/processes. If x is `auto`, the program will determine the proper number of threads.

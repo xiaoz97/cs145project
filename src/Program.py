@@ -16,7 +16,6 @@ from types import SimpleNamespace
 
 import datasetHelper
 import dbHelper
-import DecisionTree
 
 
 def ensureMovieTagsFile(dbConnection, fileName: str, allTagIds, relevanceThreshold: float):
@@ -369,14 +368,21 @@ SELECT userId FROM TestRatings''')
 	except:
 		parallel = 1
 
+	try:
+		i = sys.argv.index('--model')
+		m = sys.argv[i + 1]
+		model = __import__(m, fromlist=['Classifier'])
+	except:
+		model = __import__('DecisionTree', fromlist=['Classifier'])
+
 	if parallel == 1:
-		classifyForUsersInThread(1, DecisionTree.Classifier(ALL_GENRES, ALL_TAG_IDS, userIds))
+		classifyForUsersInThread(1, model.Classifier(ALL_GENRES, ALL_TAG_IDS, userIds))
 	else:
 		chunkedUserIds = list(chunkify(userIds, cpu_count()))
 		pool = Pool(len(chunkedUserIds))
 
 		for i in range(len(chunkedUserIds)):
-			pool.apply_async(classifyForUsersInThread, args=(i + 1, DecisionTree.Classifier(ALL_GENRES, ALL_TAG_IDS, chunkedUserIds[i])))
+			pool.apply_async(classifyForUsersInThread, args=(i + 1, model.Classifier(ALL_GENRES, ALL_TAG_IDS, chunkedUserIds[i])))
 
 		pool.close()
 		pool.join()
