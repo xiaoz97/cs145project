@@ -472,7 +472,7 @@ from (Select
 			print("Unable to submit dataset through kaggle API. Did you install the API and configure your API key properly?", file=sys.stderr)
 
 
-DATA_FOLDER = os.path.normpath(os.path.dirname(os.path.realpath("__file__")) + "/../data")
+DATA_FOLDER = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../data")
 ALL_GENRES = sorted(['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'IMAX', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western'])
 MAX_ROWS = 0
 FIRST_USERS = None
