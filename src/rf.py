@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 #!/usr/bin/env python3
 
 import bitstring
@@ -87,13 +81,13 @@ def ensureMovieTagsTable(fileName, dbConnection):
 		# skip header
 		headers = next(csvReader)
 
-		cur.execute("CREATE TABLE {0} (id INTEGER NOT NULL PRIMARY KEY, {1})".format(TABLE_NAME, ','.join([h+' integer not null' for h in headers[1:]])))
+		cur.execute("CREATE TABLE {0} (id INTEGER NOT NULL PRIMARY KEY, {1})".format(TABLE_NAME, ','.join([h + ' integer not null' for h in headers[1:]])))
 		# table names can't be the target of parameter substitution
 		# https://stackoverflow.com/a/3247553/746461
 
 		to_db = list(csvReader)
 
-		cur.executemany("INSERT INTO {0} VALUES (?,{1})".format(TABLE_NAME, ','.join(['?']*(len(headers)-1))), to_db)
+		cur.executemany("INSERT INTO {0} VALUES (?,{1})".format(TABLE_NAME, ','.join(['?'] * (len(headers) - 1))), to_db)
 		dbConnection.commit()
 
 	cur.execute('select * from {0} where id=2'.format(TABLE_NAME))
@@ -147,6 +141,7 @@ def ensureMovieYearGenresFile(dataFolder, movieYearGenresFileName):
 				map[genresDict[item.genres[i]]] = 1
 
 			writer.writerow([id, item.year, map.int])
+
 
 def ensureMovieYearGenresTable(movieYearGenresFileName, dbConnection):
 	cur = dbConnection.cursor()
@@ -275,7 +270,7 @@ join MovieTags on Ratings.movieId=MovieTags.id'''.format(','.join(['tagBits' + s
 	'''    
 	if len(trainingData) == 0:
 		raise Exception('User {0} does not appear in training set.'.format(userId))
-	''' 
+	'''
 	y = trainingData[:, 0]
 	X = trainingData[:, 1:]
 	return clf.fit(X, y)
@@ -301,7 +296,7 @@ join MovieTags on TestRatings.movieId=MovieTags.id
 
 	toDB = predictY[:, None]
 
-	#toDB = np.insert(toDB, 1, userId, axis=1)
+	# toDB = np.insert(toDB, 1, userId, axis=1)
 	toDB = np.insert(toDB, 1, testingData[:, 0], axis=1)
 	toDB = np.insert(toDB, 2, testingData[:, 1], axis=1)
 	cursor.executemany('update TestRatings set predict=? where movieId=? and userId=?', toDB.tolist())
@@ -313,39 +308,39 @@ def classifyUser(con):
 
 	cur = con.cursor()
 	print('1')
-	clf = RandomForestClassifier(n_estimators=10)
+	clf = RandomForestClassifier(n_estimators=100)
 	clf = trainClassifier(cur, clf)
 
 	print('2')
-    
+
 	cur.execute('''
 SELECT ValidationRatings.movieId, ValidationRatings.userId, MovieYearGenres.year, genreBits, {0} FROM ValidationRatings
 join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
 join MovieTags on ValidationRatings.movieId=MovieTags.id'''.format(','.join(['tagBits' + str(i) for i in range(tagBitsCount)])))
 	validationData = [list(row[0:3]) +
-#                      list(row[3:4])+
+					  #                      list(row[3:4])+
 					  list(bitstring.Bits(int=row[2], length=len(ALL_GENRES))) +
-					  flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[4:]]) 
+					  flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[4:]])
 					  for row in cur.fetchall()]
-    
+
 	validationData = np.array(validationData, dtype='int32')
-    
+
 	print('2')
-    
-	#print(validationData[0:5,:])#delete,???
-	#print([list(row[0:2]) for row in cur.fetchall()])#delete
-	#print([list(bitstring.Bits(int=row[2], length=len(ALL_GENRES))) for row in cur.fetchall()])#delete
-    
+
+	# print(validationData[0:5,:])#delete,???
+	# print([list(row[0:2]) for row in cur.fetchall()])#delete
+	# print([list(bitstring.Bits(int=row[2], length=len(ALL_GENRES))) for row in cur.fetchall()])#delete
+
 	predictY = clf.predict(validationData[:, 1:])
 	toDB = predictY[:, None]
-	#toDB = np.insert(toDB, 1, userId, axis=1)
-	#print(toDB.tolist())
+	# toDB = np.insert(toDB, 1, userId, axis=1)
+	# print(toDB.tolist())
 	toDB = np.insert(toDB, 1, validationData[:, 0], axis=1)
 	toDB = np.insert(toDB, 2, validationData[:, 1], axis=1)
-    
+
 	print('3')
-    
-	#print(toDB.tolist())
+
+	# print(toDB.tolist())
 	cur.executemany('update ValidationRatings set predict=? where movieId=? and userId=?', toDB.tolist())
 	if cur.rowcount == 0:
 		raise Exception("No rows are updated.")
@@ -355,11 +350,13 @@ join MovieTags on ValidationRatings.movieId=MovieTags.id'''.format(','.join(['ta
 	predictTest(cur, clf)
 	print('4')
 	con.commit()
-	# cur.execute('select count(*) from ValidationRatings where userId=? and rating=predict', (userId,))
-	# correct = cur.fetchone()[0]
-	# # break
-	# print('user {0}, accuracy is {1:.2f}.'.format(userId, correct / len(predictY)))  # prefer format than %.
-	# print('User {0} is done.'.format(userId))
+
+
+# cur.execute('select count(*) from ValidationRatings where userId=? and rating=predict', (userId,))
+# correct = cur.fetchone()[0]
+# # break
+# print('user {0}, accuracy is {1:.2f}.'.format(userId, correct / len(predictY)))  # prefer format than %.
+# print('User {0} is done.'.format(userId))
 
 
 def dealWithMissingPrediction(cursor, table: str):
@@ -373,7 +370,7 @@ def dealWithMissingPrediction(cursor, table: str):
 
 def exportTestRatings(cursor, fileName: str):
 	cursor.execute('select rowid-1, predict from TestRatings order by rowid')
-	data=cursor.fetchall()
+	data = cursor.fetchall()
 	with open(os.path.join(DATA_FOLDER, fileName), 'w', newline="") as f:
 		writer = csv.writer(f, delimiter=',')
 		writer.writerow(['Id', 'rating'])
@@ -400,8 +397,16 @@ def main():
 
 	cur = con.cursor()
 	ALL_TAG_IDS = [row[0] for row in cur.execute('select DISTINCT tagId from GenomeScore order by tagId')]
-	ensureMovieTagsFile(con, 'movie-tags.csv', ALL_TAG_IDS, 0.5)
-	ensureMovieTagsTable('movie-tags.csv', con)
+
+	try:
+		i = sys.argv.index('--relevance')
+		relevance = float(sys.argv[i + 1])
+	except:
+		relevance = 0.5
+
+	movieTagsFileName = '{0:.2f}-'.format(relevance) + 'movie-tags.csv'
+	ensureMovieTagsFile(con, movieTagsFileName, ALL_TAG_IDS, relevance)
+	ensureMovieTagsTable(movieTagsFileName, con)
 
 	ensureRatingsTable('train_ratings_binary.csv', con)
 	ensureValidationRatingsTable('val_ratings_binary.csv', con)
@@ -426,22 +431,8 @@ SELECT userId FROM TestRatings''')
 
 	startTime = time.time()
 
-	lastP = 0
-	total = len(userIds)
-	'''
-    
-	for i in range(100):#range(total):
-		classifyUser(con, userIds[i])
+	classifyUser(con)
 
-		p = i * 100 // total
-		if p > lastP:
-			usedTime = time.time() - startTime
-			print('User {0} is done. Progress is {1}%. Used time is {2}s, Remaining time is {3:d}s'.format(i, p, int(usedTime), int(usedTime / p * 100 - usedTime)))
-			lastP = p
-	'''
-    
-	classifyUser(con)    
-    
 	dealWithMissingPrediction(cur, 'ValidationRatings')
 	dealWithMissingPrediction(cur, 'TestRatings')
 
@@ -481,17 +472,10 @@ from (Select
 			print("Unable to submit dataset through kaggle API. Did you install the API and configure your API key properly?", file=sys.stderr)
 
 
-DATA_FOLDER = os.path.normpath(os.path.dirname(os.path.realpath("__file__")) + "/../my_data")
+DATA_FOLDER = os.path.normpath(os.path.dirname(os.path.realpath("__file__")) + "/../data")
 ALL_GENRES = sorted(['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'IMAX', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western'])
 MAX_ROWS = 0
 FIRST_USERS = None
 
 if __name__ == "__main__":
 	main()
-
-
-# In[ ]:
-
-
-
-
