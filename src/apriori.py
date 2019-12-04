@@ -120,52 +120,58 @@ def getSortedConfidence(favorable_reviews_by_users):
 	return sorted_confidence
 
 
-data_folder = datasetHelper.getDataset()
-freq = getFrequentPatterns(data_folder)
-# print(freq)
-ratings_filename = data_folder + '/train_ratings_binary.csv'
-# Get favorite movies for each user
-all_ratings = pd.read_csv(ratings_filename)
+def main():
+	global DATA_FOLDER
 
-favorable_ratings = all_ratings[all_ratings["rating"] == 1]
+	DATA_FOLDER = datasetHelper.getDataset()
+	# Get favorite movies for each user
+	all_ratings = pd.read_csv(DATA_FOLDER + '/train_ratings_binary.csv')
 
-favorable_reviews_by_users = dict((k, frozenset(v.values)) for k, v in favorable_ratings.groupby("userId")["movieId"])
+	favorable_ratings = all_ratings[all_ratings["rating"] == 1]
 
-sorted_confidence = getSortedConfidence(favorable_reviews_by_users)
+	favorable_reviews_by_users = dict((k, frozenset(v.values)) for k, v in favorable_ratings.groupby("userId")["movieId"])
 
-# Validation Part
-# 读入validation set
+	sorted_confidence = getSortedConfidence(favorable_reviews_by_users)
 
-validate_filename = data_folder + '/val_ratings_binary.csv'
+	# Validation Part
+	# 读入validation set
 
-validate = pd.read_csv(validate_filename)
-correct = 0
-total = 0
-print("start")
-print(sorted_confidence)
+	validate_filename = DATA_FOLDER + '/val_ratings_binary.csv'
 
-for index, row in validate.iterrows():
-	# cnt标记prediction total为总数
-	cnt = 0
-	total += 1
-	for confidence, rules in sorted_confidence:
+	validate = pd.read_csv(validate_filename)
+	correct = 0
+	total = 0
+	print("start")
+	print(sorted_confidence)
 
-		if rules[1] == row["movieId"]:
-			if (len(list(rules[0]) + list(favorable_reviews_by_users[row["userId"]])) - len(
-					list(set(list(rules[0]) + list(favorable_reviews_by_users[row["userId"]]))))) / (
-					len(rules[0])) >= 0.5:
-				cnt = 1
-				if cnt == row["rating"]:
-					print("yes")
-				else:
-					print("no")
-				break
-	# If the new movie is not in our rules, then randomly generate 0 or 1;
-	if (cnt == 0):
-		cnt = np.random.randint(0, 1)
-	# Compare with real rating
-	if cnt == row["rating"]:
-		correct += 1
-		# print accuracy
-		if (correct % 1000 == 0):
-			print(correct / total)
+	for index, row in validate.iterrows():
+		# cnt标记prediction total为总数
+		cnt = 0
+		total += 1
+		for confidence, rules in sorted_confidence:
+
+			if rules[1] == row["movieId"]:
+				if (len(list(rules[0]) + list(favorable_reviews_by_users[row["userId"]])) - len(
+						list(set(list(rules[0]) + list(favorable_reviews_by_users[row["userId"]]))))) / (
+						len(rules[0])) >= 0.5:
+					cnt = 1
+					if cnt == row["rating"]:
+						print("yes")
+					else:
+						print("no")
+					break
+		# If the new movie is not in our rules, then randomly generate 0 or 1;
+		if (cnt == 0):
+			cnt = np.random.randint(0, 1)
+		# Compare with real rating
+		if cnt == row["rating"]:
+			correct += 1
+			# print accuracy
+			if (correct % 1000 == 0):
+				print(correct / total)
+
+
+DATA_FOLDER = None
+
+if __name__ == "__main__":
+	main()
