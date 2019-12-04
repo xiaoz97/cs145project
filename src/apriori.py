@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import mlxtend.frequent_patterns
+import time
 
 from mlxtend.preprocessing import TransactionEncoder
 
@@ -82,7 +83,8 @@ else:
 	correct_counts = defaultdict(int)
 	incorrect_counts = defaultdict(int)
 	# Traverse the whole dataset
-	for user, reviews in favorable_reviews_by_users.items():
+	for i, pair in enumerate(favorable_reviews_by_users.items()):
+		userId, reviews = pair
 		# 遍历每条关联规则
 		for candidate_rule in candidate_rules:
 			candidate_rule = tuple(candidate_rule)
@@ -95,6 +97,14 @@ else:
 					correct_counts[candidate_rule] += 1
 				else:
 					incorrect_counts[candidate_rule] += 1
+
+		p = (i+1) * 100 / total
+		if int(p) > lastP:
+			usedTime = time.time() - startTime
+			print('User {0} is done. Progress is {1}%. Used time is {2}s. Remaining time is {3}s.'.
+				  format(userId, int(p), int(usedTime), int(usedTime / p * 100 - usedTime)))
+			lastP = p
+
 	# Decide minimum confidence; Here we set as 0.4
 
 	min_confidence = 0.4
