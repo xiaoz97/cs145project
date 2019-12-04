@@ -40,7 +40,7 @@ def getFrequentPatterns(data_folder):
 
 	print("dataset shape is " + str(encodedDataset.shape))
 	print("Run apriori with min_support=0.05")
-	frequentPatterns = mlxtend.frequent_patterns.apriori(encodedDataset, min_support=0.05)
+	frequentPatterns = mlxtend.frequent_patterns.fpgrowth(encodedDataset, min_support=0.05)
 	frequentPatterns['length'] = frequentPatterns['itemsets'].apply(lambda x: len(x))
 	freq = frequentPatterns[frequentPatterns['length'] >= 2]
 	np.save(os.path.join(data_folder, "freq.npy"), freq)
