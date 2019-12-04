@@ -49,7 +49,8 @@ def getFrequentPatterns(data_folder):
 	np.save(os.path.join(data_folder, "freq.npy"), freq)
 	return freq
 
-def getSortedConfidence(favorable_reviews_by_users):
+
+def getSortedConfidence(favorable_reviews_by_users) -> dict:
 	global DATA_FOLDER
 	# load sorted_confidence; If file doesn't exist, then generate a new one.
 	if os.path.isfile(os.path.join(DATA_FOLDER, "sorted_confidence.npy")) is False:
@@ -94,7 +95,7 @@ def getSortedConfidence(favorable_reviews_by_users):
 			p = (i+1) * 100 / total
 			if int(p) > lastP:
 				usedTime = time.time() - startTime
-				print('User {0} is done. Progress is {1}%. Used time is {2}s. Remaining time is {3}s.'.
+				print('Collected rules from user {0}. Progress is {1}%. Used time is {2}s. Remaining time is {3}s.'.
 					  format(userId, int(p), int(usedTime), int(usedTime / p * 100 - usedTime)))
 				lastP = p
 
