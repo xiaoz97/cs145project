@@ -22,7 +22,7 @@ def getFrequentPatterns(data_folder):
 
 	startTime = time.time()
 	# 给u.data 加标题行
-	all_ratings = pd.read_csv(ratings_filename)
+	all_ratings = pd.read_csv(ratings_filename, dtype='int32')
 	print('Loading data takes {0} seconds.'.format(time.time() - startTime))
 
 	# 新建一个数据集，只包括用户喜欢某部电影的数据行
@@ -126,7 +126,7 @@ def main():
 
 	DATA_FOLDER = datasetHelper.getDataset()
 	# Get favorite movies for each user
-	all_ratings = pd.read_csv(DATA_FOLDER + '/train_ratings_binary.csv')
+	all_ratings = pd.read_csv(DATA_FOLDER + '/train_ratings_binary.csv', dtype='int32')
 
 	favorable_ratings = all_ratings[all_ratings["rating"] == 1]
 
@@ -139,7 +139,7 @@ def main():
 
 	validate_filename = DATA_FOLDER + '/val_ratings_binary.csv'
 
-	validate = pd.read_csv(validate_filename)
+	validate = pd.read_csv(validate_filename, dtype='int32')
 	correct = 0
 	total = 0
 	print("start")
