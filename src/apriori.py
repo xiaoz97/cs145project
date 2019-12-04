@@ -47,6 +47,78 @@ def getFrequentPatterns(data_folder):
 	np.save(os.path.join(data_folder, "freq.npy"), freq)
 	return freq
 
+def getSortedConfidence(favorable_reviews_by_users):
+	global DATA_FOLDER
+	# load sorted_confidence; If file doesn't exist, then generate a new one.
+	if os.path.isfile(os.path.join(DATA_FOLDER, "sorted_confidence.npy")) is False:
+		freq = getFrequentPatterns(DATA_FOLDER)
+		print("Frequent patterns loaded")
+
+		from collections import defaultdict
+
+		candidate_rules = []
+		# generate potential rule candidates
+		for rules in freq:
+			for conclusion in rules[1]:
+				# 项集中的其他电影作为前提
+				temp = list(rules[1])
+				temp.remove(conclusion)
+				temp = tuple(temp)
+				# 用前提和结论组成备选规则
+				candidate_rules.append((temp, conclusion))
+
+		correct_counts = defaultdict(int)
+		incorrect_counts = defaultdict(int)
+
+		startTime = time.time()
+		lastP = -1
+		total = len(favorable_reviews_by_users)
+
+		# Traverse the whole dataset
+		for i, pair in enumerate(favorable_reviews_by_users.items()):
+			userId, favorableMovies = pair
+			# 遍历每条关联规则
+			for candidate_rule in candidate_rules:
+				# print(candidate_rule)
+				premise, conclusion = candidate_rule
+				# 判断用户是否喜欢前提中的电影
+				if set(premise).issubset(favorableMovies):
+					# 如果前提符合，看一下用户是否喜欢结论中的电影
+					if conclusion in favorableMovies:
+						correct_counts[candidate_rule] += 1
+					else:
+						incorrect_counts[candidate_rule] += 1
+
+			p = (i+1) * 100 / total
+			if int(p) > lastP:
+				usedTime = time.time() - startTime
+				print('User {0} is done. Progress is {1}%. Used time is {2}s. Remaining time is {3}s.'.
+					  format(userId, int(p), int(usedTime), int(usedTime / p * 100 - usedTime)))
+				lastP = p
+
+		# Decide minimum confidence; Here we set as 0.4
+
+		min_confidence = 0.4
+		rule_confidence = []
+		print("start measuring")
+
+		# Calculate the confidence of each rule candidates
+		for candidate_rule in candidate_rules:
+			if (correct_counts[tuple(candidate_rule)] + incorrect_counts[tuple(candidate_rule)] != 0):
+				confidence = correct_counts[tuple(candidate_rule)] / (
+					float(correct_counts[tuple(candidate_rule)] + incorrect_counts[tuple(candidate_rule)]))
+				print(confidence)
+
+				if confidence > min_confidence:
+					rule_confidence.append((confidence, candidate_rule))
+					print(confidence, candidate_rule, )
+
+		print(rule_confidence)
+		np.save(os.path.join(DATA_FOLDER, "sorted_confidence.npy"), rule_confidence)
+
+	sorted_confidence = np.load(os.path.join(DATA_FOLDER, "sorted_confidence.npy"), allow_pickle=True)
+	return sorted_confidence
+
 
 data_folder = datasetHelper.getDataset()
 freq = getFrequentPatterns(data_folder)
@@ -57,74 +129,9 @@ all_ratings = pd.read_csv(ratings_filename)
 
 favorable_ratings = all_ratings[all_ratings["rating"] == 1]
 
-candidate_rules = []
+favorable_reviews_by_users = dict((k, frozenset(v.values)) for k, v in favorable_ratings.groupby("userId")["movieId"])
 
-favorable_reviews_by_users = dict(
-	(k, frozenset(v.values)) for k, v in favorable_ratings.groupby("userId")["movieId"])
-
-# load sorted_confidence; If file doesn't exist, then generate a new one.
-if os.path.isfile(os.path.join(data_folder, "sorted_confidence.npy")):
-	sorted_confidence = np.load(os.path.join(data_folder, "sorted_confidence.npy"), allow_pickle=True)
-	print("load sort")
-	print(sorted_confidence)
-else:
-	from collections import defaultdict
-
-	# generate potential rule candidates
-	for rules in freq:
-		for conclusion in rules[1]:
-			# 项集中的其他电影作为前提
-			temp = list(rules[1])
-			temp.remove(conclusion)
-			temp = tuple(temp)
-			# 用前提和结论组成备选规则
-			candidate_rules.append((temp, conclusion))
-
-	correct_counts = defaultdict(int)
-	incorrect_counts = defaultdict(int)
-	# Traverse the whole dataset
-	for i, pair in enumerate(favorable_reviews_by_users.items()):
-		userId, reviews = pair
-		# 遍历每条关联规则
-		for candidate_rule in candidate_rules:
-			candidate_rule = tuple(candidate_rule)
-			# print(candidate_rule)
-			premise, conclusion = candidate_rule
-			# 判断用户是否喜欢前提中的电影
-			if set(premise).issubset(reviews):
-				# 如果前提符合，看一下用户是否喜欢结论中的电影
-				if conclusion in reviews:
-					correct_counts[candidate_rule] += 1
-				else:
-					incorrect_counts[candidate_rule] += 1
-
-		p = (i+1) * 100 / total
-		if int(p) > lastP:
-			usedTime = time.time() - startTime
-			print('User {0} is done. Progress is {1}%. Used time is {2}s. Remaining time is {3}s.'.
-				  format(userId, int(p), int(usedTime), int(usedTime / p * 100 - usedTime)))
-			lastP = p
-
-	# Decide minimum confidence; Here we set as 0.4
-
-	min_confidence = 0.4
-	rule_confidence = []
-	print("start measuring")
-
-	# Calculate the confidence of each rule candidates
-	for candidate_rule in candidate_rules:
-		if (correct_counts[tuple(candidate_rule)] + incorrect_counts[tuple(candidate_rule)] != 0):
-			confidence = correct_counts[tuple(candidate_rule)] / (
-				float(correct_counts[tuple(candidate_rule)] + incorrect_counts[tuple(candidate_rule)]))
-			print(confidence)
-
-			if confidence > min_confidence:
-				rule_confidence.append((confidence, candidate_rule))
-				print(confidence, candidate_rule, )
-
-	print(rule_confidence)
-	np.save(os.path.join(data_folder, "sorted_confidence.npy"), rule_confidence)
-	sorted_confidence = np.load(os.path.join(data_folder, "sorted_confidence.npy"), allow_pickle=True)
+sorted_confidence = getSortedConfidence(favorable_reviews_by_users)
 
 # Validation Part
 # 读入validation set
