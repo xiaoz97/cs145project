@@ -8,6 +8,7 @@ from mlxtend.preprocessing import TransactionEncoder
 
 import datasetHelper
 
+from Program import getDefaultPrediction
 
 def getFrequentPatterns(data_folder):
 	# 文件夹地址
@@ -162,7 +163,7 @@ def main():
 					break
 		# If the new movie is not in our rules, then randomly generate 0 or 1;
 		if (cnt == 0):
-			cnt = np.random.randint(0, 1)
+			cnt = getDefaultPrediction()
 		# Compare with real rating
 		if cnt == row["rating"]:
 			correct += 1
