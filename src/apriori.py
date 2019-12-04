@@ -120,11 +120,17 @@ def getSortedConfidence(favorable_reviews_by_users) -> dict:
 					rule_confidence.append(item)
 					print(confidence, candidate_rule)
 
-		print(rule_confidence)
+		ruleDic = {}
+		for item in rule_confidence:
+			if item.conclusion not in ruleDic:
+				ruleDic[item.conclusion] = []
+
+			ruleDic[item.conclusion].append((item.confidence, item.premise))
+
 		np.save(os.path.join(DATA_FOLDER, "sorted_confidence.npy"), rule_confidence)
 
 	sorted_confidence = np.load(os.path.join(DATA_FOLDER, "sorted_confidence.npy"), allow_pickle=True)
-	return sorted_confidence
+	return sorted_confidence.item()
 
 
 def main():
@@ -146,33 +152,46 @@ def main():
 	validate_filename = DATA_FOLDER + '/val_ratings_binary.csv'
 
 	validate = pd.read_csv(validate_filename, dtype='int32')
+	total = len(validate)
 	correct = 0
-	total = 0
 	print("start")
-	print(sorted_confidence)
 
+	startTime = time.time()
+	lastP = -1
 	for index, row in validate.iterrows():
 		# cnt标记prediction total为总数
+		userId = row["userId"]
 		predict = None
-		total += 1
-		for confidence, rules in sorted_confidence:
-			if rules[1] == row["movieId"]:
-				userId = row["userId"]
 
-				l = len(set(rules[0]).intersection(favorable_reviews_by_users[userId]))
+		rules = sorted_confidence.get(row["movieId"])
+		favorableMovies = favorable_reviews_by_users.get(userId)
+		if rules is not None and favorableMovies is not None:
+			for rule in rules:
+				confidence = rule[0]
+				premise = rule[1]
 
-				if l / len(rules[0]) >= 0.5:
+				l = len(set(premise).intersection(favorableMovies))
+
+				if l / len(premise) >= 0.5:
 					predict = 1
 					break
-		# If the new movie is not in our rules, then randomly generate 0 or 1;
-		if predict is None:
+				else:
+					predict = 0
+		else:
 			predict = getDefaultPrediction()
+
 		# Compare with real rating
 		if predict == row["rating"]:
 			correct += 1
-			# print accuracy
-			if (correct % 1000 == 0):
-				print(correct / total)
+
+		p = (index + 1) * 100 / total
+		if int(p) > lastP:
+			usedTime = time.time() - startTime
+			print('User {0} is done. Progress is {1}%. Used time is {2}s. Remaining time is {3}s.'.
+				  format(userId, int(p), int(usedTime), int(usedTime / p * 100 - usedTime)))
+			lastP = p
+
+	print('accuracy is {0}.'.format(correct / total))
 
 
 DATA_FOLDER = None
