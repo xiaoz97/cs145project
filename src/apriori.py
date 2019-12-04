@@ -5,6 +5,7 @@ import mlxtend.frequent_patterns
 import time
 
 from mlxtend.preprocessing import TransactionEncoder
+from types import SimpleNamespace
 
 import datasetHelper
 
@@ -111,8 +112,12 @@ def getSortedConfidence(favorable_reviews_by_users):
 				print(confidence)
 
 				if confidence > min_confidence:
-					rule_confidence.append((confidence, candidate_rule))
-					print(confidence, candidate_rule, )
+					item = SimpleNamespace()
+					item.confidence = confidence
+					item.premise = candidate_rule[0]
+					item.conclusion = candidate_rule[1]
+					rule_confidence.append(item)
+					print(confidence, candidate_rule)
 
 		print(rule_confidence)
 		np.save(os.path.join(DATA_FOLDER, "sorted_confidence.npy"), rule_confidence)
@@ -147,25 +152,22 @@ def main():
 
 	for index, row in validate.iterrows():
 		# cnt标记prediction total为总数
-		cnt = 0
+		predict = None
 		total += 1
 		for confidence, rules in sorted_confidence:
-
 			if rules[1] == row["movieId"]:
-				if (len(list(rules[0]) + list(favorable_reviews_by_users[row["userId"]])) - len(
-						list(set(list(rules[0]) + list(favorable_reviews_by_users[row["userId"]]))))) / (
-						len(rules[0])) >= 0.5:
-					cnt = 1
-					if cnt == row["rating"]:
-						print("yes")
-					else:
-						print("no")
+				userId = row["userId"]
+
+				l = len(set(rules[0]).intersection(favorable_reviews_by_users[userId]))
+
+				if l / len(rules[0]) >= 0.5:
+					predict = 1
 					break
 		# If the new movie is not in our rules, then randomly generate 0 or 1;
-		if (cnt == 0):
-			cnt = getDefaultPrediction()
+		if predict is None:
+			predict = getDefaultPrediction()
 		# Compare with real rating
-		if cnt == row["rating"]:
+		if predict == row["rating"]:
 			correct += 1
 			# print accuracy
 			if (correct % 1000 == 0):
