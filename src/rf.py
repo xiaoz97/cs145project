@@ -252,43 +252,42 @@ def flatNestList(a):
 	return [item for sublist in a for item in sublist]
 
 
-def trainClassifier(cursor, clf):
+def trainClassifier(cursor, userId, clf):
 	global ALL_TAG_IDS
 	tagBitsCount = math.ceil(len(ALL_TAG_IDS) / 32.0)
 
 	cursor.execute('''
-SELECT Ratings.rating, Ratings.userId, MovieYearGenres.year, genreBits, {0} FROM Ratings
+SELECT Ratings.rating, MovieYearGenres.year, genreBits, {0} FROM Ratings
 join MovieYearGenres on Ratings.movieId=MovieYearGenres.id
-join MovieTags on Ratings.movieId=MovieTags.id'''.format(','.join(['tagBits' + str(i) for i in range(tagBitsCount)])))
+join MovieTags on Ratings.movieId=MovieTags.id
+where Ratings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(tagBitsCount)])), (userId,))
 
-	trainingData = [list(row[0:3]) +
-					list(bitstring.Bits(int=row[3], length=len(ALL_GENRES))) +
-					flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[4:]])
+	trainingData = [list(row[0:2]) +
+					list(bitstring.Bits(int=row[2], length=len(ALL_GENRES))) +
+					flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[3:]])
 					for row in cursor.fetchall()]
 
 	trainingData = np.array(trainingData, dtype='int32')
-	'''    
 	if len(trainingData) == 0:
 		raise Exception('User {0} does not appear in training set.'.format(userId))
-	'''
 	y = trainingData[:, 0]
 	X = trainingData[:, 1:]
 	return clf.fit(X, y)
 
 
-def predictTest(cursor, clf):
+def predictTest(cursor, userId, clf):
 	global ALL_TAG_IDS
 	tagBitsCount = math.ceil(len(ALL_TAG_IDS) / 32.0)
 
 	cursor.execute('''
-SELECT TestRatings.movieId, TestRatings.userId, MovieYearGenres.year, genreBits, {0} FROM TestRatings
+SELECT TestRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM TestRatings
 join MovieYearGenres on TestRatings.movieId=MovieYearGenres.id
-join MovieTags on TestRatings.movieId=MovieTags.id 
-'''.format(','.join(['tagBits' + str(i) for i in range(tagBitsCount)])))
+join MovieTags on TestRatings.movieId=MovieTags.id
+where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(tagBitsCount)])), (userId,))
 
-	testingData = [list(row[0:3]) +
-				   list(bitstring.Bits(int=row[3], length=len(ALL_GENRES))) +
-				   flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[4:]])
+	testingData = [list(row[0:2]) +
+				   list(bitstring.Bits(int=row[2], length=len(ALL_GENRES))) +
+				   flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[3:]])
 				   for row in cursor.fetchall()]
 
 	testingData = np.array(testingData, dtype='int32')
@@ -296,59 +295,47 @@ join MovieTags on TestRatings.movieId=MovieTags.id
 
 	toDB = predictY[:, None]
 
-	# toDB = np.insert(toDB, 1, userId, axis=1)
-	toDB = np.insert(toDB, 1, testingData[:, 0], axis=1)
-	toDB = np.insert(toDB, 2, testingData[:, 1], axis=1)
-	cursor.executemany('update TestRatings set predict=? where movieId=? and userId=?', toDB.tolist())
+	toDB = np.insert(toDB, 1, userId, axis=1)
+	toDB = np.insert(toDB, 2, testingData[:, 0], axis=1)
+	cursor.executemany('update TestRatings set predict=? where userId=? and movieId=?', toDB.tolist())
 
 
-def classifyUser(con):
+def classifyUser(con, userId):
 	global ALL_TAG_IDS
 	tagBitsCount = math.ceil(len(ALL_TAG_IDS) / 32.0)
 
 	cur = con.cursor()
-	print('1')
+
 	clf = RandomForestClassifier(n_estimators=100)
-	clf = trainClassifier(cur, clf)
-
-	print('2')
-
+	clf = trainClassifier(cur, userId, clf)
+    
+    
 	cur.execute('''
-SELECT ValidationRatings.movieId, ValidationRatings.userId, MovieYearGenres.year, genreBits, {0} FROM ValidationRatings
+SELECT ValidationRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM ValidationRatings
 join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
-join MovieTags on ValidationRatings.movieId=MovieTags.id'''.format(','.join(['tagBits' + str(i) for i in range(tagBitsCount)])))
-	validationData = [list(row[0:3]) +
-					  #                      list(row[3:4])+
+join MovieTags on ValidationRatings.movieId=MovieTags.id
+where ValidationRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(tagBitsCount)])), (userId,))
+	validationData = [list(row[0:2]) +
 					  list(bitstring.Bits(int=row[2], length=len(ALL_GENRES))) +
-					  flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[4:]])
+					  flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[3:]])
 					  for row in cur.fetchall()]
 
 	validationData = np.array(validationData, dtype='int32')
-
-	print('2')
-
-	# print(validationData[0:5,:])#delete,???
-	# print([list(row[0:2]) for row in cur.fetchall()])#delete
-	# print([list(bitstring.Bits(int=row[2], length=len(ALL_GENRES))) for row in cur.fetchall()])#delete
-
+    
+    
 	predictY = clf.predict(validationData[:, 1:])
 	toDB = predictY[:, None]
-	# toDB = np.insert(toDB, 1, userId, axis=1)
-	# print(toDB.tolist())
-	toDB = np.insert(toDB, 1, validationData[:, 0], axis=1)
-	toDB = np.insert(toDB, 2, validationData[:, 1], axis=1)
-
-	print('3')
-
-	# print(toDB.tolist())
-	cur.executemany('update ValidationRatings set predict=? where movieId=? and userId=?', toDB.tolist())
+	toDB = np.insert(toDB, 1, userId, axis=1)
+	toDB = np.insert(toDB, 2, validationData[:, 0], axis=1)
+	cur.executemany('update ValidationRatings set predict=? where userId=? and movieId=?', toDB.tolist())
 	if cur.rowcount == 0:
 		raise Exception("No rows are updated.")
 	# tree.plot_tree(clf)
 	# plt.show()
 	con.commit()
-	predictTest(cur, clf)
-	print('4')
+	predictTest(cur, userId, clf)
+    
+    
 	con.commit()
 
 
@@ -431,7 +418,16 @@ SELECT userId FROM TestRatings''')
 
 	startTime = time.time()
 
-	classifyUser(con)
+	lastP = 0
+	total = len(userIds)
+	for i in range(total):
+		classifyUser(con, userIds[i])
+
+		p = i * 100 // total
+		if p > lastP:
+			usedTime = time.time() - startTime
+			print('User {0} is done. Progress is {1}%. Used time is {2}s, Remaining time is {3:d}s'.format(i, p, int(usedTime), int(usedTime / p * 100 - usedTime)), flush=True)
+			lastP = p
 
 	dealWithMissingPrediction(cur, 'ValidationRatings')
 	dealWithMissingPrediction(cur, 'TestRatings')
