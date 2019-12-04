@@ -254,9 +254,9 @@ def ensureTestRatingTable(fileName, dbConnection):
 def dealWithMissingPrediction(cursor, table: str):
 	global FIRST_USERS
 	if FIRST_USERS is None:
-		cursor.execute('update {0} set predict=? where predict is null'.format(table), (1,))
+		cursor.execute('update {0} set predict=? where predict is null'.format(table), (getDefaultPrediction(),))
 	else:
-		cursor.execute('update {0} set predict=? where predict is null and userId<=?'.format(table), (1, FIRST_USERS))
+		cursor.execute('update {0} set predict=? where predict is null and userId<=?'.format(table), (getDefaultPrediction(), FIRST_USERS))
 	print('Fixed {0} empty prediction in table {1}.'.format(cursor.rowcount, table))
 
 
@@ -421,6 +421,9 @@ from (Select
 		if os.system('kaggle competitions submit -c uclacs145fall2019 -m "auto submission with accuracy {1}" -f "{0}"'.format(os.path.join(DATA_FOLDER, 'submit.csv'), accuracy)) != 0:
 			print("Unable to submit dataset through kaggle API. Did you install the API and configure your API key properly?", file=sys.stderr)
 
+
+def getDefaultPrediction():
+	return 1
 
 DATA_FOLDER = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../data")
 ALL_GENRES = sorted(['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'IMAX', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western'])
