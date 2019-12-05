@@ -18,8 +18,8 @@ class Classifier(object):
 		self.ALL_TAG_IDS = ALL_TAG_IDS
 		self.userIds=userIds
 		self.tagBitsCount = math.ceil(len(self.ALL_TAG_IDS) / 32.0)
-	def __predictTest(self, cursor, userId, clf):
 
+	def __predictTest(self, cursor, userId, clf):
 		cursor.execute('''
 SELECT TestRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM TestRatings
 join MovieYearGenres on TestRatings.movieId=MovieYearGenres.id
@@ -85,7 +85,7 @@ where ValidationRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in
 		bestClf = None
 		bestScore = 0
 		try:
-			for train_index, test_index in StratifiedKFold(n_splits).split(X, y):
+			for train_index, test_index in StratifiedKFold(n_splits, random_state=1206).split(X, y):
 				X_train, X_test = X[train_index], X[test_index]
 				y_train, y_test = y[train_index], y[test_index]
 
