@@ -106,7 +106,7 @@ else:
                 rule_confidence.append((confidence, candidate_rule))
                 print(confidence, candidate_rule, )
 
-    print(rule_confidence)
+    //print(rule_confidence)
     np.save(os.path.join(data_folder, "sorted_confidence.npy"), rule_confidence)
     sorted_confidence = np.load(os.path.join(data_folder, "sorted_confidence.npy"), allow_pickle=True)
 
@@ -148,3 +148,4 @@ for index, row in validate.iterrows():
         # print accuracy
         if (correct % 1000 == 0):
             print(correct / total)
+
