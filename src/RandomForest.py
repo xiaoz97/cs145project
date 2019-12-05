@@ -2,7 +2,7 @@ import bitstring
 import math
 import numpy as np
 
-from sklearn import tree
+from sklearn.ensemble import RandomForestClassifier
 
 from Program import flatNestList
 
@@ -45,9 +45,9 @@ join MovieTags on TestRatings.movieId=MovieTags.id
 where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(self.tagBitsCount)])), (userId,))
 
 		testingData = [list(row[0:2]) +
-					   list(bitstring.Bits(int=row[2], length=len(self.ALL_GENRES))) +
-					   flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[3:]])
-					   for row in cursor.fetchall()]
+				   		list(bitstring.Bits(int=row[2], length=len(self.ALL_GENRES))) +
+				   		flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[3:]])
+				   		for row in cursor.fetchall()]
 
 		testingData = np.array(testingData, dtype='int32')
 		predictY = clf.predict(testingData[:, 1:])
@@ -62,7 +62,7 @@ where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range
 	def classifyForUser(self, con, userId):
 		cur = con.cursor()
 
-		clf = tree.DecisionTreeClassifier(random_state=10)
+		clf = RandomForestClassifier(n_estimators=100)
 		clf = self.trainClassifier(cur, userId, clf)
 		cur.execute('''
 SELECT ValidationRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM ValidationRatings
