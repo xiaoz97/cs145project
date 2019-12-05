@@ -4,9 +4,7 @@ import numpy as np
 
 from sklearn import tree
 
-
-def flatNestList(a):
-	return [item for sublist in a for item in sublist]
+from Program import flatNestList
 
 
 class Classifier(object):

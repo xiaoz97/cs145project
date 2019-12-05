@@ -428,6 +428,10 @@ from (Select
 			print("Unable to submit dataset through kaggle API. Did you install the API and configure your API key properly?", file=sys.stderr)
 
 
+def flatNestList(a):
+	return [item for sublist in a for item in sublist]
+
+
 def getDefaultPrediction():
 	return 1
 
