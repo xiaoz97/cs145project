@@ -13,7 +13,6 @@ class Classifier(object):
 		self.ALL_GENRES = ALL_GENRES
 		self.ALL_TAG_IDS = ALL_TAG_IDS
 		self.userIds=userIds
-
 		self.tagBitsCount = math.ceil(len(self.ALL_TAG_IDS) / 32.0)
 
 
@@ -38,12 +37,12 @@ class Classifier(object):
 		return clf.fit(X, y)
 
 
-	def predictTest(self,cursor, userId, clf):
+	def predictTest(self, cursor, userId, clf):
 		cursor.execute('''
-	SELECT TestRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM TestRatings
-	join MovieYearGenres on TestRatings.movieId=MovieYearGenres.id
-	join MovieTags on TestRatings.movieId=MovieTags.id
-	where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(self.tagBitsCount)])), (userId,))
+SELECT TestRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM TestRatings
+join MovieYearGenres on TestRatings.movieId=MovieYearGenres.id
+join MovieTags on TestRatings.movieId=MovieTags.id
+where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(self.tagBitsCount)])), (userId,))
 
 		testingData = [list(row[0:2]) +
 					   list(bitstring.Bits(int=row[2], length=len(self.ALL_GENRES))) +
@@ -66,10 +65,10 @@ class Classifier(object):
 		clf = tree.DecisionTreeClassifier(random_state=10)
 		clf = self.trainClassifier(cur, userId, clf)
 		cur.execute('''
-	SELECT ValidationRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM ValidationRatings
-	join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
-	join MovieTags on ValidationRatings.movieId=MovieTags.id
-	where ValidationRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(self.tagBitsCount)])), (userId,))
+SELECT ValidationRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM ValidationRatings
+join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
+join MovieTags on ValidationRatings.movieId=MovieTags.id
+where ValidationRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(self.tagBitsCount)])), (userId,))
 		validationData = [list(row[0:2]) +
 						  list(bitstring.Bits(int=row[2], length=len(self.ALL_GENRES))) +
 						  flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[3:]])
@@ -88,8 +87,3 @@ class Classifier(object):
 		con.commit()
 		self.predictTest(cur, userId, clf)
 		con.commit()
-	# cur.execute('select count(*) from ValidationRatings where userId=? and rating=predict', (userId,))
-	# correct = cur.fetchone()[0]
-	# # break
-	# print('user {0}, accuracy is {1:.2f}.'.format(userId, correct / len(predictY)))  # prefer format than %.
-	# print('User {0} is done.'.format(userId))

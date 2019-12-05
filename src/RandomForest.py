@@ -6,6 +6,7 @@ from sklearn.ensemble import RandomForestClassifier
 
 from Program import flatNestList
 
+
 class Classifier(object):
 
 	def __init__(self, ALL_GENRES, ALL_TAG_IDS, userIds):
@@ -13,6 +14,8 @@ class Classifier(object):
 		self.ALL_TAG_IDS = ALL_TAG_IDS
 		self.userIds=userIds
 		self.tagBitsCount = math.ceil(len(self.ALL_TAG_IDS) / 32.0)
+
+
 
 	def trainClassifier(self, cursor, userId, clf):
 		cursor.execute('''
@@ -61,8 +64,6 @@ where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range
 
 		clf = RandomForestClassifier(n_estimators=100)
 		clf = self.trainClassifier(cur, userId, clf)
-    
-    
 		cur.execute('''
 SELECT ValidationRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM ValidationRatings
 join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
@@ -77,11 +78,7 @@ where ValidationRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in
 		predictY = clf.predict(validationData[:, 1:])
 		toDB = predictY[:, None]
 		toDB = np.insert(toDB, 1, userId, axis=1)
-		# print(toDB.tolist())
 		toDB = np.insert(toDB, 2, validationData[:, 0], axis=1)
-
-
-		# print(toDB.tolist())
 		cur.executemany('update ValidationRatings set predict=? where userId=? and movieId=?', toDB.tolist())
 		if cur.rowcount == 0:
 			raise Exception("No rows are updated.")
