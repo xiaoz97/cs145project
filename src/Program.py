@@ -371,20 +371,27 @@ SELECT userId FROM TestRatings''')
 	try:
 		i = sys.argv.index('--model')
 		m = sys.argv[i + 1]
-		model = __import__(m, fromlist=['Classifier'])
 	except:
-		model = __import__('DecisionTree', fromlist=['Classifier'])
+		m = 'DecisionTree'
+
+	if m == 'DecisionTree':
+		from DecisionTree import Classifier
+	elif m == 'RandomForest':
+		from RandomForest import Classifier
+	else:
+		print('Unknown model ' + m, file=sys.stderr)
+		sys.exit(1)
 		
-	print('Classification using {0} starts with {1} processes.'.format(model, parallel))
+	print('Classification using {0} starts with {1} processes.'.format(m, parallel))
 	
 	if parallel == 1:
-		classifyForUsersInThread(1, model.Classifier(ALL_GENRES, ALL_TAG_IDS, userIds))
+		classifyForUsersInThread(1, Classifier(ALL_GENRES, ALL_TAG_IDS, userIds))
 	else:
 		chunkedUserIds = list(chunkify(userIds, cpu_count()))
 		pool = Pool(len(chunkedUserIds))
 
 		for i in range(len(chunkedUserIds)):
-			pool.apply_async(classifyForUsersInThread, args=(i + 1, model.Classifier(ALL_GENRES, ALL_TAG_IDS, chunkedUserIds[i])))
+			pool.apply_async(classifyForUsersInThread, args=(i + 1, Classifier(ALL_GENRES, ALL_TAG_IDS, chunkedUserIds[i])))
 
 		pool.close()
 		pool.join()
