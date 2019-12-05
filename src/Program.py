@@ -12,6 +12,7 @@ import time
 
 from multiprocessing import Pool
 from multiprocessing import cpu_count
+from subprocess import Popen, PIPE
 from types import SimpleNamespace
 
 import datasetHelper
@@ -433,7 +434,26 @@ from (Select
 	if FIRST_USERS is None and (bestAccuracy == 1 or accuracy > bestAccuracy):
 		with open(os.path.join(DATA_FOLDER, 'best accuracy.txt'), mode='w') as f:
 			f.write(str(accuracy))
-		if os.system('kaggle competitions submit -c uclacs145fall2019 -m "auto submission with accuracy {1}" -f "{0}"'.format(os.path.join(DATA_FOLDER, 'submit.csv'), accuracy)) != 0:
+
+		gitStatus = ''
+		process = Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], stdout=PIPE, cwd=os.path.dirname(os.path.realpath(__file__)))
+		(output, err) = process.communicate()
+		exit_code = process.wait()
+		if exit_code == 0:
+			gitBranch = output.decode("utf-8").strip()
+			gitStatus = 'Git [{0}]'.format(gitBranch)
+
+		process = Popen(['git', 'rev-parse', '--short=8', 'HEAD'], stdout=PIPE, cwd=os.path.dirname(os.path.realpath(__file__)))
+		(output, err) = process.communicate()
+		exit_code = process.wait()
+		if exit_code == 0:
+			gitSha = output.decode("utf-8").strip()
+			gitStatus += '({0})'.format(gitSha)
+
+		if gitStatus != '':
+			gitStatus += ' '
+
+		if os.system('kaggle competitions submit -c uclacs145fall2019 -m "{3}{2} submitted with accuracy {1:.4f}" -f "{0}"'.format(os.path.join(DATA_FOLDER, 'submit.csv'), accuracy, m, gitStatus)) != 0:
 			print("Unable to submit dataset through kaggle API. Did you install the API and configure your API key properly?", file=sys.stderr)
 
 
