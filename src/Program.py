@@ -284,10 +284,10 @@ def classifyForUsersInThread(threadId, classifier):
 			try:
 				classifier.classifyForUser(con, classifier.userIds[i])
 			except sqlite3.OperationalError as ex:
-				print(ex, file=sys.stderr)
+				print('Error on User {0}: '.format(classifier.userIds[i])+str(ex), file=sys.stderr)
 				exit(1)
 			except Exception as ex:
-				print(ex, file=sys.stderr)
+				print('Error on User {0}: '.format(classifier.userIds[i])+str(ex), file=sys.stderr)
 
 			p = i * 100 // total
 			if p > lastP:
