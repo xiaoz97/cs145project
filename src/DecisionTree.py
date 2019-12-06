@@ -47,7 +47,7 @@ class Classifier(object):
 		bestClf = None
 		bestScore = -1
 		try:
-			for train_index, test_index in sklearn.model_selection.KFold(n_splits).split(X, y):
+			for train_index, test_index in sklearn.model_selection.KFold(n_splits, True, 1206).split(X, y):
 				X_train, X_test = X[train_index], X[test_index]
 				y_train, y_test = y[train_index], y[test_index]
 
