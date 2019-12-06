@@ -384,15 +384,21 @@ SELECT userId FROM TestRatings''')
 		sys.exit(1)
 		
 	print('Classification using {0} starts with {1} processes.'.format(m, parallel))
-	
+
+	try:
+		i = sys.argv.index('--year-size')
+		yearSize = sys.argv[i + 1]
+	except:
+		yearSize = None
+
 	if parallel == 1:
-		classifyForUsersInThread(1, Classifier(ALL_GENRES, ALL_TAG_IDS, userIds))
+		classifyForUsersInThread(1, Classifier(ALL_GENRES, ALL_TAG_IDS, userIds, yearSize=yearSize))
 	else:
 		chunkedUserIds = list(chunkify(userIds, parallel))
 		pool = Pool(len(chunkedUserIds))
 
 		for i in range(len(chunkedUserIds)):
-			pool.apply_async(classifyForUsersInThread, args=(i + 1, Classifier(ALL_GENRES, ALL_TAG_IDS, chunkedUserIds[i])))
+			pool.apply_async(classifyForUsersInThread, args=(i + 1, Classifier(ALL_GENRES, ALL_TAG_IDS, chunkedUserIds[i], yearSize=yearSize)))
 
 		pool.close()
 		pool.join()
