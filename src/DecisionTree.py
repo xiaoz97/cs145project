@@ -1,11 +1,11 @@
 import bitstring
 import math
 import numpy as np
+import sklearn.model_selection
 import sys
 
 from sklearn import tree
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import StratifiedKFold, train_test_split
 from traceback import format_exc
 
 from Program import flatNestList
@@ -47,7 +47,7 @@ class Classifier(object):
 		bestClf = None
 		bestScore = 0
 		try:
-			for train_index, test_index in StratifiedKFold(n_splits, random_state=1206).split(X, y):
+			for train_index, test_index in sklearn.model_selection.KFold(n_splits).split(X, y):
 				X_train, X_test = X[train_index], X[test_index]
 				y_train, y_test = y[train_index], y[test_index]
 
