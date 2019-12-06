@@ -3,13 +3,20 @@ from numpy import loadtxt
 from keras.models import Sequential
 from keras.layers import Dense
 from keras import optimizers
+
 import os
 import datasetHelper
 import Program
 import generate_movieRatings
+import dbHelper
+# import math
+# import bitstring
+
+# ALL_GENRES = sorted(['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'IMAX', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western'])
 
 # Construct input data
 dataFolder = datasetHelper.getDataset()
+movieYearGenresFileName = 'movies-year-genres.csv'
 Program.ensureMovieYearGenresFile(dataFolder, 'movies-year-genres.csv')
 generate_movieRatings.ensureMergedCsv(dataFolder)
 
