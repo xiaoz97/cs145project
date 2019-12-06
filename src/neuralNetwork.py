@@ -27,8 +27,8 @@ validation_y = validation_data['rating'].to_numpy()
 
 # define the keras model
 model = Sequential()
-model.add(Dense(23, input_dim=23, activation='relu'))
-model.add(Dense(20, activation='relu'))
+model.add(Dense(10, input_dim=5, activation='relu'))
+model.add(Dense(5, activation='relu'))
 # model.add(Dense(20, activation='relu'))
 model.add(Dense(1, activation='sigmoid'))
 
