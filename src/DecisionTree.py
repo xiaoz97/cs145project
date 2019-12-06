@@ -54,11 +54,12 @@ class Classifier(object):
 				clf = tree.DecisionTreeClassifier(random_state=10)
 				clf.fit(X_train, y_train)
 
-				predictY = clf.predict(X_test)
+				# predictY = clf.predict(X_test)
+				score= clf.score(X_test, y_test)
 
 				# Ideally we should use roc_auc_score, but there are cases where
 				# only one class present in y_true. ROC AUC score is not defined in that case.
-				score = roc_auc_score(y_test, predictY)
+				#score = roc_auc_score(y_test, predictY)
 				if score > bestScore:
 					bestScore = score
 					bestClf = clf
