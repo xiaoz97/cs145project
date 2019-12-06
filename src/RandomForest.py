@@ -1,8 +1,11 @@
 import bitstring
 import math
 import numpy as np
-
+# xiao add plt function
+import matplotlib.pyplot as plt
+# add ends
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import validation_curve
 
 from Program import flatNestList
 
@@ -62,8 +65,10 @@ where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range
 	def classifyForUser(self, con, userId):
 		cur = con.cursor()
 
-		clf = RandomForestClassifier(n_estimators=100)
+
+		clf = RandomForestClassifier(n_estimators=200)
 		clf = self.trainClassifier(cur, userId, clf)
+
 		cur.execute('''
 SELECT ValidationRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM ValidationRatings
 join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
