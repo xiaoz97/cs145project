@@ -45,7 +45,7 @@ class Classifier(object):
 		# Make sure each fold has at least 5 samples, and we want at most 5 folds.
 		n_splits = min(len(X) // 5, 5)
 		bestClf = None
-		bestScore = 0
+		bestScore = -1
 		try:
 			for train_index, test_index in sklearn.model_selection.KFold(n_splits).split(X, y):
 				X_train, X_test = X[train_index], X[test_index]
