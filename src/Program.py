@@ -388,7 +388,7 @@ SELECT userId FROM TestRatings''')
 	if parallel == 1:
 		classifyForUsersInThread(1, Classifier(ALL_GENRES, ALL_TAG_IDS, userIds))
 	else:
-		chunkedUserIds = list(chunkify(userIds, cpu_count()))
+		chunkedUserIds = list(chunkify(userIds, parallel))
 		pool = Pool(len(chunkedUserIds))
 
 		for i in range(len(chunkedUserIds)):
