@@ -11,13 +11,9 @@ import ClassifierBase
 
 class Classifier(ClassifierBase.ClassifierBase):
 
-	def __init__(self, ALL_GENRES, ALL_TAG_IDS, userIds):
-		self.ALL_GENRES = ALL_GENRES
-		self.ALL_TAG_IDS = ALL_TAG_IDS
-		self.userIds=userIds
-		self.tagBitsCount = math.ceil(len(self.ALL_TAG_IDS) / 32.0)
-
-
+	def __init__(self, allGenres, allTagIds, userIds, yearSize=4):
+		super().__init__(allGenres, allTagIds, yearSize)
+		self.userIds = userIds
 
 	def trainClassifier(self, cursor, userId, clf):
 		trainingData = self.getTrainingData(cursor, userId)
