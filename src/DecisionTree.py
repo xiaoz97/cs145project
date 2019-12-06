@@ -43,7 +43,7 @@ class Classifier(object):
 		X = trainingData[:, 1:]
 			
 		# Make sure each fold has at least 5 samples, and we want at most 5 folds.
-		n_splits = min(len(X) // 5, 5)
+		n_splits = min(len(X) // 5, 10)
 		bestClf = None
 		bestScore = -1
 		try:
