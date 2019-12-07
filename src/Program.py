@@ -367,7 +367,7 @@ SELECT userId FROM TestRatings''')
 		else:
 			parallel = int(sys.argv[i + 1])
 	except:
-		parallel = 1
+		parallel = cpu_count()
 
 	try:
 		i = sys.argv.index('--model')
