@@ -211,6 +211,7 @@ def ensureRatingsTable(fileName, dbConnection):
 		dbConnection.commit()
 
 	cur.execute('select * from {0} where userId=1 and movieId=151'.format(TABLE_NAME))
+	print(TABLE_NAME)
 	print(cur.fetchone())
 
 
@@ -231,6 +232,7 @@ def ensureValidationRatingsTable(fileName, dbConnection):
 		dbConnection.commit()
 
 	cur.execute('select * from {0} where userId=1 and movieId=1653'.format(TABLE_NAME))
+	print(TABLE_NAME)
 	print(cur.fetchone())
 
 
@@ -250,6 +252,23 @@ def ensureTestRatingTable(fileName, dbConnection):
 		cur.executemany("INSERT INTO {0} VALUES (?,?, null);".format(TABLE_NAME), to_db)
 		dbConnection.commit()
 
+
+def ensureMoviePopularityTable(dbConnection):
+	cur = dbConnection.cursor()
+	TABLE_NAME = 'MoviePopularity'
+	if dbHelper.doesTableExist(TABLE_NAME, cur):
+		return
+
+	cur.execute("CREATE TABLE {0} (movieId INTEGER NOT NULL, popularity integer not null, PRIMARY KEY(movieId))".format(TABLE_NAME))
+	cur.execute('''
+insert into {0}
+select movieId, cast(sum(rating) as real) / count(*)
+from Ratings
+GROUP by movieId'''.format(TABLE_NAME))
+	dbConnection.commit()
+	cur.execute('select * from {0} where movieId=1653'.format(TABLE_NAME))
+	print(TABLE_NAME)
+	print(cur.fetchone())
 
 def dealWithMissingPrediction(cursor, table: str):
 	global FIRST_USERS
@@ -339,6 +358,8 @@ def main():
 	ensureRatingsTable('train_ratings_binary.csv', con)
 	ensureValidationRatingsTable('val_ratings_binary.csv', con)
 	ensureTestRatingTable('test_ratings.csv', con)
+
+	ensureMoviePopularityTable(con)
 
 	cur.execute('update ValidationRatings set predict=null')
 	cur.execute('update TestRatings set predict=null')

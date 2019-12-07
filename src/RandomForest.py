@@ -19,14 +19,15 @@ class Classifier(object):
 
 	def trainClassifier(self, cursor, userId, clf):
 		cursor.execute('''
-	SELECT Ratings.rating, MovieYearGenres.year, genreBits, {0} FROM Ratings
-	join MovieYearGenres on Ratings.movieId=MovieYearGenres.id
-	join MovieTags on Ratings.movieId=MovieTags.id
-	where Ratings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(self.tagBitsCount)])), (userId,))
+SELECT Ratings.rating, cast(MoviePopularity.popularity*10 as integer), MovieYearGenres.year, genreBits, {0} FROM Ratings
+join MovieYearGenres on Ratings.movieId=MovieYearGenres.id
+join MovieTags on Ratings.movieId=MovieTags.id
+join MoviePopularity on Ratings.movieId=MoviePopularity.movieId
+where Ratings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(self.tagBitsCount)])), (userId,))
 
-		trainingData = [list(row[0:2]) +
-						list(bitstring.Bits(int=row[2], length=len(self.ALL_GENRES))) +
-						flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[3:]])
+		trainingData = [list(row[0:3]) +
+						list(bitstring.Bits(int=row[3], length=len(self.ALL_GENRES))) +
+						flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[4:]])
 						for row in cursor.fetchall()]
 
 		trainingData = np.array(trainingData, dtype='int32')
@@ -39,14 +40,15 @@ class Classifier(object):
 
 	def predictTest(self, cursor, userId, clf):
 		cursor.execute('''
-SELECT TestRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM TestRatings
+SELECT TestRatings.movieId, cast(MoviePopularity.popularity*10 as integer), MovieYearGenres.year, genreBits, {0} FROM TestRatings
 join MovieYearGenres on TestRatings.movieId=MovieYearGenres.id
 join MovieTags on TestRatings.movieId=MovieTags.id
+join MoviePopularity on TestRatings.movieId=MoviePopularity.movieId
 where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(self.tagBitsCount)])), (userId,))
 
-		testingData = [list(row[0:2]) +
-				   		list(bitstring.Bits(int=row[2], length=len(self.ALL_GENRES))) +
-				   		flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[3:]])
+		testingData = [list(row[0:3]) +
+				   		list(bitstring.Bits(int=row[3], length=len(self.ALL_GENRES))) +
+				   		flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[4:]])
 				   		for row in cursor.fetchall()]
 
 		testingData = np.array(testingData, dtype='int32')
@@ -65,13 +67,14 @@ where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range
 		clf = RandomForestClassifier(n_estimators=100)
 		clf = self.trainClassifier(cur, userId, clf)
 		cur.execute('''
-SELECT ValidationRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM ValidationRatings
+SELECT ValidationRatings.movieId, cast(MoviePopularity.popularity*10 as integer), MovieYearGenres.year, genreBits, {0} FROM ValidationRatings
 join MovieYearGenres on ValidationRatings.movieId=MovieYearGenres.id
 join MovieTags on ValidationRatings.movieId=MovieTags.id
+join MoviePopularity on ValidationRatings.movieId=MoviePopularity.movieId
 where ValidationRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range(self.tagBitsCount)])), (userId,))
-		validationData = [list(row[0:2]) +
-						  list(bitstring.Bits(int=row[2], length=len(self.ALL_GENRES))) +
-						  flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[3:]])
+		validationData = [list(row[0:3]) +
+						  list(bitstring.Bits(int=row[3], length=len(self.ALL_GENRES))) +
+						  flatNestList([list(bitstring.Bits(int=b, length=32)) for b in row[4:]])
 						  for row in cur.fetchall()]
 
 		validationData = np.array(validationData, dtype='int32')
