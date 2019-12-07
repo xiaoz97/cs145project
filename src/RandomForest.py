@@ -62,7 +62,7 @@ where TestRatings.userId=?'''.format(','.join(['tagBits' + str(i) for i in range
 	def classifyForUser(self, con, userId):
 		cur = con.cursor()
 
-		clf = RandomForestClassifier(n_estimators=100)
+		clf = RandomForestClassifier(n_estimators=100, max_depth=10)
 		clf = self.trainClassifier(cur, userId, clf)
 		cur.execute('''
 SELECT ValidationRatings.movieId, MovieYearGenres.year, genreBits, {0} FROM ValidationRatings
