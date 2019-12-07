@@ -15,7 +15,7 @@ highest:0.53
 
 `--model x`:
 
-Choose a model to run. `x` should be a file name inside the src folder. By default the program uses `DecisionTree`.
+Choose a model to run. `x` should be a file name inside the src folder. By default the program uses `RandomForest`.
 
 `--parallel x`:
 

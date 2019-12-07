@@ -373,7 +373,7 @@ SELECT userId FROM TestRatings''')
 		i = sys.argv.index('--model')
 		m = sys.argv[i + 1]
 	except:
-		m = 'DecisionTree'
+		m = 'RandomForest'
 
 	if m == 'DecisionTree':
 		from DecisionTree import Classifier
